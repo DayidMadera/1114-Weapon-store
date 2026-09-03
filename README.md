@@ -1,4 +1,4 @@
-# 1114-WarDog Store | 
+# 1114-WarDog Store 
 ---
 
 ## DESCRIPCIÓN
