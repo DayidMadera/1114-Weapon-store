@@ -1,10 +1,14 @@
 # Documento de Requisitos de Producto (PRD)
 
-> **Estado:** `Draft` &nbsp;|&nbsp; **Fase:** `Fase 1` &nbsp;|&nbsp; **Última actualización:** `2026-09-03` &nbsp;|&nbsp; **Versión:** `1.0`
+## INTEGRATES
+
+-JUAN DAVID MARTINEZ PERDOMO
+-DAYID ESTEBAN MADERA PAEZ
+
 
 ---
 
-## 📋 1. Información General
+##  1. Información General
 
 ### 1.1 Nombre del Proyecto
 **`Multi-Vendor Checkout`**
