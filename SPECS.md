@@ -1,4 +1,5 @@
-# Documento de Requisitos de Producto (PRD)
+# SPEC
+
 
 ## INTEGRATES
 
