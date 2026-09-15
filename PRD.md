@@ -71,7 +71,7 @@ Si los vendedores se encuentran en ciudades diferentes:
 
 ---
 
-## 👤 4. Historias de Usuario
+##  4. Historias de Usuario
 
 ### `US-01` — Carrito multi-vendedor
 > **Como** comprador,  
