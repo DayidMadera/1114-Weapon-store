@@ -9,3 +9,9 @@ WarDog Store es una tienda de venta armamentistica, se encarga de permitir un fo
 
 ## USO DE TECNOLOGIAS PRINCIPALES
 
+---
+
+## Integrantes 
+
+* Juan David Martinez Perdomo
+* Dayid Esteban Madera Paez
