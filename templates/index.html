@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-5">
+    <h2>Tu Carrito de Compras</h2>
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Subtotal</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="cart-items">
+                    <!-- Los productos guardados se cargarán dinámicamente con JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3">
+                <h4>Resumen del Pedido</h4>
+                <hr>
+                <div class="d-flex justify-content-between fs-5 fw-bold">
+                    <span>Total:</span>
+                    <span id="cart-total">$0.00</span>
+                </div>
+                <button id="btn-checkout" class="btn btn-success w-100 mt-3" onclick="procesarCompra()">
+                    Finalizar Compra
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<button 
+    class="btn btn-primary btn-agregar" 
+    data-id="{{ producto.id }}" 
+    data-nombre="{{ producto.nombre|escape }}" 
+    data-precio="{{ producto.precio }}">
+    Agregar al carrito
+</button>
+
+
+
+<script src="..//styles/js.js"></script>
+{% endblock %}
