@@ -1,4 +1,4 @@
-![Uploading unnamed.png…]()
+![Texto alternativo](ruta/relativa/a/la/imagen.png)
 
 # 1114-WarDog Store 
 ---
