@@ -1,4 +1,4 @@
-![Texto alternativo](ruta/relativa/a/la/imagen.png)
+![Texto alternativo]([ruta/relativa/a/la/imagen.png](https://github.com/DayidMadera/1114-Weapon-store/blob/main/styles/unnamed.png))
 
 # 1114-WarDog Store 
 ---
