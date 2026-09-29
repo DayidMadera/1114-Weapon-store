@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Producto - Panel Vendedor</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <header style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Editar Producto</h1>
+        <a href="/vendedor">← Cancelar y Volver</a>
+    </header>
+    <hr>
+
+    <main style="max-width: 800px; margin: 0 auto;">
+        <form action="{{ url_for('editar_producto', id=producto.id) }}" method="POST" enctype="multipart/form-data">
+            <label><strong>Nombre del Producto:</strong></label><br>
+            <input type="text" name="nombre" value="{{ producto.nombre }}" style="width: 100%; padding: 8px;" required><br><br>
+
+            <label><strong>Precio ($):</strong></label><br>
+            <input type="number" step="0.01" name="precio" value="{{ producto.precio }}" style="width: 100%; padding: 8px;" required><br><br>
+
+            <label><strong>Stock Disponible:</strong></label><br>
+            <input type="number" name="stock" value="{{ producto.stock }}" min="0" style="width: 100%; padding: 8px;" required><br><br>
+
+            <label><strong>Opción de Envío:</strong></label><br>
+            <select name="envio" style="width: 100%; padding: 8px;" required>
+                <option value="Envío Gratis a todo el país" {% if producto.envio == 'Envío Gratis a todo el país' %}selected{% endif %}>Envío Gratis a todo el país</option>
+                <option value="Envío Estándar ($5.000)" {% if producto.envio == 'Envío Estándar ($5.000)' %}selected{% endif %}>Envío Estándar ($5.000)</option>
+                <option value="Retiro en local del vendedor" {% if producto.envio == 'Retiro en local del vendedor' %}selected{% endif %}>Retiro en local del vendedor</option>
+            </select><br><br>
+
+            <label><strong>Descripción y Detalles:</strong></label><br>
+            <textarea name="descripcion" rows="5" style="width: 100%; padding: 8px;" required>{{ producto.descripcion }}</textarea><br><br>
+
+            <label><strong>Reemplazar Imágenes (Opcional - Seleccionar varias):</strong></label><br>
+            <input type="file" name="imagenes_archivos" accept="image/*" multiple><br><br>
+
+            <button type="submit" style="background-color: #1976d2; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px;">
+                Guardar Cambios
+            </button>
+        </form>
+    </main>
+</body>
+</html>

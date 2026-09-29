@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <title>Mi Perfil - Mercado Libre</title>
 </head>
-<body>
-    <header>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <header style="display: flex; justify-content: space-between; align-items: center;">
         <h1>Mercado Libre</h1>
         <nav style="display: flex; align-items: center; gap: 10px;">
             <a href="/">← Volver a la Vitrina</a> | 
@@ -18,36 +18,46 @@
     </header>
     <hr>
 
-    <main>
-        <!-- BOTÓN PRINCIPAL PARA REGRESAR -->
-        <div style="margin-bottom: 15px;">
-            <a href="/">
-                <button type="button" style="padding: 8px 16px; cursor: pointer;">← Regresar al Inicio</button>
-            </a>
-        </div>
-
+    <main style="max-width: 800px; margin: 0 auto;">
         <h2>Mi Perfil</h2>
-        <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
-            <img src="{{ usuario.foto_perfil }}" alt="Foto de Perfil" width="120" height="120" style="border-radius: 50%; object-fit: cover; border: 1px solid #ccc;">
+        <div style="display: flex; gap: 20px; align-items: center; background-color: #f9f9f9; padding: 20px; border-radius: 8px;">
+            <img src="{{ usuario.foto_perfil }}" alt="Foto de Perfil" width="120" height="120" style="border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
             <div>
-                <h3>{{ usuario.nombre }}</h3>
-                <p><strong>Rol:</strong> {{ usuario.rol | capitalize }}</p>
-                <p><strong>Correo:</strong> {{ usuario.email }}</p>
-                <p><strong>Descripción:</strong> {{ usuario.descripcion }}</p>
+                <h3 style="margin: 0;">{{ usuario.nombre }}</h3>
+                <p><strong>Rol:</strong> <span style="text-transform: capitalize;">{{ usuario.rol }}</span></p>
+                <p><strong>Correo Electrónico:</strong> {{ usuario.email }}</p>
+                <p><strong>Sobre mí:</strong> {{ usuario.descripcion }}</p>
             </div>
         </div>
 
-        <hr>
+        <!-- MÁS INFORMACIÓN DEL USUARIO / SISTEMA -->
+        <div style="margin-top: 20px; display: flex; gap: 15px;">
+            {% if usuario.rol == 'vendedor' %}
+            <div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 6px; border: 1px solid #90caf9;">
+                <h4 style="margin: 0; color: #1565c0;">Mis Publicaciones</h4>
+                <p style="font-size: 22px; font-weight: bold; margin: 5px 0;">{{ mis_productos_count }} productos</p>
+                <small>Publicados activamente en el catálogo</small>
+            </div>
+            {% endif %}
+
+            <div style="flex: 1; background: #f3e5f5; padding: 15px; border-radius: 6px; border: 1px solid #ce93d8;">
+                <h4 style="margin: 0; color: #6a1b9a;">Catálogo General</h4>
+                <p style="font-size: 22px; font-weight: bold; margin: 5px 0;">{{ total_catalogo_count }} publicaciones</p>
+                <small>Total de artículos registrados en el sitio</small>
+            </div>
+        </div>
+
+        <hr style="margin-top: 30px;">
 
         <h3>Editar Información de Perfil</h3>
         <form action="/editar_perfil" method="POST" enctype="multipart/form-data">
-            <label>Seleccionar Imagen desde tu Computadora:</label><br>
+            <label><strong>Cambiar Imagen de Perfil:</strong></label><br>
             <input type="file" name="foto_archivo" accept="image/*"><br><br>
 
-            <label>Descripción:</label><br>
-            <textarea name="descripcion" rows="4" style="width: 350px;" required>{{ usuario.descripcion }}</textarea><br><br>
+            <label><strong>Descripción / Biografía:</strong></label><br>
+            <textarea name="descripcion" rows="4" style="width: 100%; padding: 8px;" required>{{ usuario.descripcion }}</textarea><br><br>
 
-            <button type="submit" style="padding: 8px 16px; cursor: pointer;">Guardar Cambios</button>
+            <button type="submit" style="padding: 10px 20px; background-color: #3483fa; color: white; border: none; border-radius: 4px; cursor: pointer;">Guardar Cambios</button>
         </form>
     </main>
 </body>
