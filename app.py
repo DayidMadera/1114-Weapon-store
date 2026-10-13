@@ -5,12 +5,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'clave_secreta_mercadolibre_super_segura'
+app.secret_key = 'clave_secreta_wardogstore_super_segura'
 
 @app.template_filter('formato_precio')
 def formato_precio(valor):
     try:
-        # Convierte el valor a entero y aplica punto como separador de miles
         return f"{int(valor):,}".replace(",", ".")
     except (ValueError, TypeError):
         return valor
@@ -27,6 +26,11 @@ db = SQLAlchemy(app)
 # -----------------------------------------------------------------------------
 # MODELOS DE LA BASE DE DATOS
 # -----------------------------------------------------------------------------
+class Seguidor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    seguidor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    seguido_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
@@ -34,7 +38,7 @@ class Usuario(db.Model):
     password = db.Column(db.String(200), nullable=False)
     rol = db.Column(db.String(20), nullable=False)
     foto_perfil = db.Column(db.String(300), default='/static/uploads/default.png')
-    descripcion = db.Column(db.Text, default='¡Hola! Estoy usando Mercado Libre.')
+    descripcion = db.Column(db.Text, default='¡Hola! Estoy usando WarDog Store.')
 
 class Producto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,7 +51,6 @@ class Producto(db.Model):
     vendedor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     vendedor = db.relationship('Usuario', backref=db.backref('productos', lazy=True))
     
-    # Relación con múltiples fotos
     imagenes = db.relationship('FotoProducto', backref='producto', cascade='all, delete-orphan', lazy=True)
 
 class FotoProducto(db.Model):
@@ -113,7 +116,7 @@ def logout():
     return redirect(url_for('login'))
 
 # -----------------------------------------------------------------------------
-# RUTAS DE VISTAS, PERFIL Y PRODUCTOS
+# RUTAS DE VITRINA, PERFIL Y SEGUIDORES
 # -----------------------------------------------------------------------------
 @app.route('/')
 def inicio():
@@ -131,38 +134,87 @@ def detalle_producto(id):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
 
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario_actual = Usuario.query.get(session['usuario_id'])
     producto = Producto.query.get_or_404(id)
+    vendedor = producto.vendedor
     
-    # Información total de catálogo y stock total en tienda
-    total_productos_tienda = Producto.query.count()
-    total_unidades_tienda = db.session.query(db.func.sum(Producto.stock)).scalar() or 0
+    seguidores_vendedor = Seguidor.query.filter_by(seguido_id=vendedor.id).count()
+    lo_sigo = Seguidor.query.filter_by(seguidor_id=usuario_actual.id, seguido_id=vendedor.id).first() is not None
 
     return render_template(
         'producto_detalle.html', 
         producto=producto, 
-        usuario=usuario,
-        total_productos_tienda=total_productos_tienda,
-        total_unidades_tienda=total_unidades_tienda
+        usuario=usuario_actual,
+        vendedor=vendedor,
+        seguidores_vendedor=seguidores_vendedor,
+        lo_sigo=lo_sigo
     )
 
 @app.route('/perfil')
-def vista_perfil():
+@app.route('/perfil/<int:user_id>')
+def vista_perfil(user_id=None):
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
 
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario_actual = Usuario.query.get(session['usuario_id'])
     
-    # Información adicional para el perfil
-    mis_productos_count = Producto.query.filter_by(vendedor_id=usuario.id).count() if usuario.rol == 'vendedor' else 0
-    total_catalogo_count = Producto.query.count()
+    if user_id is None or user_id == usuario_actual.id:
+        usuario = usuario_actual
+        es_propio = True
+    else:
+        usuario = Usuario.query.get_or_404(user_id)
+        es_propio = False
+
+    mis_productos = Producto.query.filter_by(vendedor_id=usuario.id).all() if usuario.rol == 'vendedor' else []
+    mis_productos_count = len(mis_productos)
+    seguidores_count = Seguidor.query.filter_by(seguido_id=usuario.id).count()
+    siguiendo_count = Seguidor.query.filter_by(seguidor_id=usuario.id).count()
+
+    lo_sigo = False
+    if not es_propio:
+        lo_sigo = Seguidor.query.filter_by(seguidor_id=usuario_actual.id, seguido_id=usuario.id).first() is not None
 
     return render_template(
         'perfil.html', 
-        usuario=usuario, 
+        usuario=usuario,
+        usuario_actual=usuario_actual,
+        es_propio=es_propio,
+        mis_productos=mis_productos,
         mis_productos_count=mis_productos_count,
-        total_catalogo_count=total_catalogo_count
+        seguidores_count=seguidores_count,
+        siguiendo_count=siguiendo_count,
+        lo_sigo=lo_sigo
     )
+
+@app.route('/seguir/<int:id>', methods=['POST'])
+def seguir_usuario(id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('login'))
+
+    usuario_actual_id = session['usuario_id']
+    if usuario_actual_id != id:
+        existente = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
+        if not existente:
+            nuevo_seguimiento = Seguidor(seguidor_id=usuario_actual_id, seguido_id=id)
+            db.session.add(nuevo_seguimiento)
+            db.session.commit()
+            flash('¡Ahora sigues a este usuario!')
+
+    return redirect(request.referrer or url_for('vista_perfil', user_id=id))
+
+@app.route('/dejar_de_seguir/<int:id>', methods=['POST'])
+def dejar_de_seguir(id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('login'))
+
+    usuario_actual_id = session['usuario_id']
+    seguimiento = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
+    if seguimiento:
+        db.session.delete(seguimiento)
+        db.session.commit()
+        flash('Has dejado de seguir a este usuario.')
+
+    return redirect(request.referrer or url_for('vista_perfil', user_id=id))
 
 @app.route('/editar_perfil', methods=['POST'])
 def editar_perfil():
@@ -188,7 +240,7 @@ def editar_perfil():
     return redirect(url_for('vista_perfil'))
 
 # -----------------------------------------------------------------------------
-# CARRITO Y VENDEDOR
+# CARRITO Y PASARELA DE PAGO
 # -----------------------------------------------------------------------------
 @app.route('/cliente')
 def vista_cliente():
@@ -197,6 +249,15 @@ def vista_cliente():
 
     usuario = Usuario.query.get(session['usuario_id'])
     carrito = session.get('carrito', [])
+    
+    for item in carrito:
+        if 'imagen' not in item:
+            prod = Producto.query.get(item['id'])
+            if prod and prod.imagenes:
+                item['imagen'] = prod.imagenes[0].ruta
+            else:
+                item['imagen'] = '/static/uploads/default_product.png'
+
     total_pagar = sum(item['precio'] * item['cantidad'] for item in carrito)
     return render_template('cliente.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
 
@@ -214,10 +275,13 @@ def agregar_al_carrito(id):
 
     carrito = session['carrito']
     encontrado = False
+    foto_ruta = producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png'
+
     for item in carrito:
         if item['id'] == producto.id:
             if item['cantidad'] < producto.stock:
                 item['cantidad'] += 1
+            item['imagen'] = foto_ruta
             encontrado = True
             break
             
@@ -226,7 +290,8 @@ def agregar_al_carrito(id):
             'id': producto.id,
             'nombre': producto.nombre,
             'precio': producto.precio,
-            'cantidad': 1
+            'cantidad': 1,
+            'imagen': foto_ruta
         })
 
     session.modified = True
@@ -237,25 +302,36 @@ def vaciar_carrito():
     session.pop('carrito', None)
     return redirect(url_for('vista_cliente'))
 
-@app.route('/procesar_compra', methods=['POST'])
-def procesar_compra():
+@app.route('/pasarela_pago', methods=['GET', 'POST'])
+def pasarela_pago():
     if 'usuario_id' not in session:
         return redirect(url_for('login'))
 
     usuario = Usuario.query.get(session['usuario_id'])
     carrito = session.get('carrito', [])
-    if not carrito:
+
+    if not carrito and request.method == 'GET':
         return redirect(url_for('vista_cliente'))
 
-    for item in carrito:
-        producto = Producto.query.get(item['id'])
-        if producto:
-            producto.stock = max(0, producto.stock - item['cantidad'])
-    
-    db.session.commit()
-    session.pop('carrito', None)
-    return render_template('cliente.html', compra_exitosa=True, carrito=[], total_pagar=0, usuario=usuario)
+    total_pagar = sum(item['precio'] * item['cantidad'] for item in carrito)
 
+    if request.method == 'POST':
+        metodo_pago = request.form.get('metodo_pago', 'PSE')
+        
+        for item in carrito:
+            producto = Producto.query.get(item['id'])
+            if producto:
+                producto.stock = max(0, producto.stock - item['cantidad'])
+
+        db.session.commit()
+        session.pop('carrito', None)
+        return render_template('pasarela_pago.html', pago_exitoso=True, metodo_pago=metodo_pago, usuario=usuario, total_pagar=total_pagar, carrito=[])
+
+    return render_template('pasarela_pago.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
+
+# -----------------------------------------------------------------------------
+# PANEL DE VENDEDOR Y GESTIÓN DE PRODUCTOS E IMÁGENES
+# -----------------------------------------------------------------------------
 @app.route('/vendedor')
 def vista_vendedor():
     if session.get('usuario_rol') != 'vendedor':
@@ -289,7 +365,6 @@ def agregar_producto():
     db.session.add(nuevo_prod)
     db.session.commit()
 
-    # Procesar subida de MÚLTIPLES imágenes
     archivos = request.files.getlist('imagenes_archivos')
     for i, archivo in enumerate(archivos):
         if archivo and archivo.filename != '':
@@ -299,7 +374,6 @@ def agregar_producto():
             nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=nuevo_prod.id)
             db.session.add(nueva_foto)
 
-    # Si no se subió ninguna imagen, colocar la imagen por defecto
     if not nuevo_prod.imagenes:
         foto_default = FotoProducto(ruta='/static/uploads/default_product.png', producto_id=nuevo_prod.id)
         db.session.add(foto_default)
@@ -324,27 +398,44 @@ def editar_producto(id):
         producto.envio = request.form.get('envio')
         producto.descripcion = request.form.get('descripcion')
 
-        # Procesar nuevas imágenes si se seleccionaron
-        archivos = request.files.getlist('imagenes_archivos')
-        subio_nuevas = any(a and a.filename != '' for a in archivos)
-        
-        if subio_nuevas:
-            # Reemplazar imágenes existentes
-            FotoProducto.query.filter_by(producto_id=producto.id).delete()
-            for i, archivo in enumerate(archivos):
-                if archivo and archivo.filename != '':
-                    nombre_archivo = secure_filename(f"prod_{producto.id}_{i}_{archivo.filename}")
-                    ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-                    archivo.save(ruta_guardado)
-                    nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=producto.id)
-                    db.session.add(nueva_foto)
+        archivos = request.files.getlist('nuevas_imagenes')
+        for i, archivo in enumerate(archivos):
+            if archivo and archivo.filename != '':
+                nombre_archivo = secure_filename(f"prod_{producto.id}_{i}_{archivo.filename}")
+                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+                archivo.save(ruta_guardado)
+                nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=producto.id)
+                db.session.add(nueva_foto)
 
         db.session.commit()
         flash('Producto actualizado correctamente.')
-        return redirect(url_for('vista_vendedor'))
+        return redirect(url_for('editar_producto', id=producto.id))
 
     usuario = Usuario.query.get(session['usuario_id'])
     return render_template('editar_producto.html', producto=producto, usuario=usuario)
+
+@app.route('/vendedor/foto/eliminar/<int:foto_id>', methods=['POST'])
+def eliminar_foto(foto_id):
+    if session.get('usuario_rol') != 'vendedor':
+        return redirect(url_for('login'))
+
+    foto = FotoProducto.query.get_or_404(foto_id)
+    producto = Producto.query.get(foto.producto_id)
+
+    if producto and producto.vendedor_id == session['usuario_id']:
+        ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
+        if os.path.exists(ruta_archivo):
+            try:
+                os.remove(ruta_archivo)
+            except Exception:
+                pass
+        
+        db.session.delete(foto)
+        db.session.commit()
+        flash('Imagen eliminada correctamente.')
+        return redirect(url_for('editar_producto', id=producto.id))
+
+    return redirect(url_for('vista_vendedor'))
 
 @app.route('/vendedor/producto/eliminar/<int:id>', methods=['POST'])
 def eliminar_producto(id):

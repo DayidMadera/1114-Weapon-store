@@ -2,84 +2,95 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>{{ producto.nombre }} - Mercado Libre</title>
+    <title>{{ producto.nombre }} - WarDog Store</title>
 </head>
-<body style="font-family: Arial, sans-serif; margin: 20px;">
+<body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #08111e; color: #ffffff;">
 
-    <header style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>Mercado Libre</h1>
-        <nav style="display: flex; align-items: center; gap: 10px;">
-            <img src="{{ usuario.foto_perfil }}" alt="Foto" width="35" height="35" style="border-radius: 50%; object-fit: cover;">
-            <span>Hola, <strong>{{ usuario.nombre }}</strong></span> | 
-            <a href="/">← Volver al Catálogo</a> | 
-            <a href="/cliente">Ver Carrito</a> | 
-            <a href="/logout">Cerrar Sesión</a>
+    <header style="background-color: #0c2340; border-bottom: 3px solid #e5a823; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
+            <span style="color: #e5a823;">WARDOG</span> STORE
+        </h1>
+        <nav style="display: flex; align-items: center; gap: 20px;">
+            <a href="/" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">← Regresar al Catálogo</a>
+            <a href="/cliente" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Carrito</a>
+            <a href="/logout" style="color: #e5a823; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Cerrar Sesión</a>
         </nav>
     </header>
-    <hr>
 
-    <main style="max-width: 900px; margin: 0 auto;">
-        <p><a href="/">← Regresar a la Vitrina</a></p>
+    <main style="max-width: 1000px; margin: 40px auto; padding: 0 20px;">
 
-        <div style="display: flex; gap: 30px; margin-top: 20px;">
+        <div style="display: flex; gap: 30px; background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
             
-            <!-- GALERÍA DE MÚLTIPLES IMÁGENES -->
+            <!-- GALERÍA DE IMÁGENES -->
             <div style="flex: 1;">
-                <img id="imagen-principal" src="{{ producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png' }}" alt="{{ producto.nombre }}" style="width: 100%; border-radius: 8px; border: 1px solid #ddd; height: 320px; object-fit: cover;">
+                <img id="imagen-principal" src="{{ producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png' }}" alt="{{ producto.nombre }}" style="width: 100%; border-radius: 2px; border: 1px solid #1c3d66; height: 320px; object-fit: cover;">
 
-                <!-- Muestrario de miniaturas -->
                 <div style="display: flex; gap: 10px; margin-top: 10px; overflow-x: auto;">
                     {% for img in producto.imagenes %}
-                        <img src="{{ img.ruta }}" onclick="document.getElementById('imagen-principal').src='{{ img.ruta }}'" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #bbb;">
+                        <img src="{{ img.ruta }}" onclick="document.getElementById('imagen-principal').src='{{ img.ruta }}'" style="width: 60px; height: 60px; object-fit: cover; border-radius: 2px; cursor: pointer; border: 1px solid #1c3d66;">
                     {% endfor %}
                 </div>
             </div>
 
             <!-- DETALLES E INFORMACIÓN -->
             <div style="flex: 1.2;">
-                <h2>{{ producto.nombre }}</h2>
-                <h1 style="color: #2e7d32; margin: 5px 0;">${{ producto.precio }}</h1>
+                <h2 style="margin-top: 0; text-transform: uppercase; letter-spacing: 1.5px; font-size: 24px;">{{ producto.nombre }}</h2>
+                <h1 style="color: #e5a823; margin: 10px 0; font-size: 32px;">${{ producto.precio | formato_precio }}</h1>
                 
-                <p><strong>🚚 Envío:</strong> <span style="color: #1565c0;">{{ producto.envio }}</span></p>
-                <p><strong>📦 Stock Disponible de este Producto:</strong> {{ producto.stock }} unidades</p>
+                <p style="color: #a2b7d0; font-size: 14px;"><strong>Envío:</strong> <span style="color: #ffffff;">{{ producto.envio }}</span></p>
+                <p style="color: #a2b7d0; font-size: 14px;"><strong>Stock Disponible:</strong> <span style="color: #ffffff;">{{ producto.stock }} unidades</span></p>
 
-                <!-- MÁS INFORMACIÓN GENERAL DE LA TIENDA -->
-                <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 10px; border-radius: 5px; font-size: 14px;">
-                    <p style="margin: 3px 0;">📊 <strong>Total de productos en el catálogo general:</strong> {{ total_productos_tienda }} artículos</p>
-                    <p style="margin: 3px 0;">🏬 <strong>Total de unidades disponibles en tienda:</strong> {{ total_unidades_tienda }} unidades</p>
-                </div>
+                <hr style="border-color: #1c3d66; margin: 20px 0;">
 
-                <hr style="margin-top: 15px;">
-
-                <h3>Especificaciones:</h3>
-                <p style="white-space: pre-line; background-color: #f9f9f9; padding: 12px; border-radius: 5px; border: 1px solid #eee;">{{ producto.descripcion }}</p>
+                <h3 style="text-transform: uppercase; letter-spacing: 1px; color: #e5a823; font-size: 14px;">Especificaciones:</h3>
+                <p style="white-space: pre-line; background-color: #061527; padding: 12px; border-radius: 2px; border: 1px solid #1c3d66; color: #d0e0f0; font-size: 14px;">{{ producto.descripcion }}</p>
 
                 {% if producto.stock > 0 %}
                     <form action="/agregar_al_carrito/{{ producto.id }}" method="POST">
-                        <button type="submit" style="width: 100%; background-color: #3483fa; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        <button type="submit" style="width: 100%; background-color: #e5a823; color: #0c2340; border: none; padding: 14px; font-size: 15px; border-radius: 2px; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
                             Añadir al Carrito / Comprar
                         </button>
                     </form>
                 {% else %}
-                    <p style="color: red; font-size: 18px; font-weight: bold;">⚠️ Producto Agotado</p>
+                    <p style="color: #ff5252; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">⚠️ Producto Agotado</p>
                 {% endif %}
             </div>
         </div>
 
-        <hr style="margin-top: 40px;">
-
-        <!-- INFORMACIÓN VENDEDOR -->
-        <div style="background-color: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
-            <h3>Información del Vendedor</h3>
+        <!-- TARJETA DEL VENDEDOR CON SEGUIDORES Y BOTÓN DE SEGUIR -->
+        <div style="margin-top: 30px; background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="{{ producto.vendedor.foto_perfil }}" alt="Foto Vendedor" width="70" height="70" style="border-radius: 50%; object-fit: cover; border: 2px solid #3483fa;">
+                <img src="{{ vendedor.foto_perfil }}" alt="Foto Vendedor" width="70" height="70" style="border-radius: 50%; object-fit: cover; border: 2px solid #e5a823;">
                 <div>
-                    <h4 style="margin: 0; font-size: 18px;">{{ producto.vendedor.nombre }}</h4>
-                    <p style="margin: 5px 0; color: #555;"><strong>Contacto:</strong> {{ producto.vendedor.email }}</p>
-                    <p style="margin: 5px 0;"><strong>Descripción:</strong> {{ producto.vendedor.descripcion }}</p>
+                    <h4 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">
+                        <a href="/perfil/{{ vendedor.id }}" style="color: #ffffff; text-decoration: none;">{{ vendedor.nombre }}</a>
+                    </h4>
+                    <p style="margin: 4px 0; color: #a2b7d0; font-size: 13px;">{{ vendedor.descripcion }}</p>
+                    <p style="margin: 4px 0; color: #e5a823; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                        Seguidores: {{ seguidores_vendedor }}
+                    </p>
                 </div>
             </div>
+
+            {% if usuario.id != vendedor.id %}
+            <div>
+                {% if lo_sigo %}
+                    <form action="/dejar_de_seguir/{{ vendedor.id }}" method="POST">
+                        <button type="submit" style="background-color: transparent; border: 2px solid #e5a823; color: #e5a823; padding: 8px 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
+                            Siguiendo ✓
+                        </button>
+                    </form>
+                {% else %}
+                    <form action="/seguir/{{ vendedor.id }}" method="POST">
+                        <button type="submit" style="background-color: #e5a823; border: none; color: #0c2340; padding: 8px 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
+                            + Seguir Vendedor
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
+
     </main>
 </body>
 </html>

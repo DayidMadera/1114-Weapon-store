@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pasarela de Pago - WarDog Store</title>
+</head>
+<body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #08111e; color: #ffffff;">
+
+    <header style="background-color: #0c2340; border-bottom: 3px solid #e5a823; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
+            <span style="color: #e5a823;">WARDOG</span> STORE
+        </h1>
+        <a href="/cliente" style="color: #e5a823; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+            ← Volver al Carrito
+        </a>
+    </header>
+
+    <main style="max-width: 850px; margin: 40px auto; padding: 0 20px;">
+
+        {% if pago_exitoso %}
+            <!-- PAGO EXITOSO -->
+            <div style="background-color: #0c2340; border: 2px solid #e5a823; padding: 40px; border-radius: 4px; text-align: center;">
+                <h1 style="color: #e5a823; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">
+                    ✓ ¡Transacción Exitosa!
+                </h1>
+                <p style="font-size: 16px; color: #ffffff; margin-bottom: 10px;">
+                    Tu orden por un valor de <strong>${{ total_pagar | formato_precio }}</strong> fue procesada correctamente.
+                </p>
+                <p style="font-size: 14px; color: #a2b7d0; text-transform: uppercase; letter-spacing: 1px;">
+                    Método de Pago: <strong>{{ metodo_pago }}</strong>
+                </p>
+                <br>
+                <a href="/" style="background-color: #e5a823; color: #0c2340; text-decoration: none; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px; display: inline-block;">
+                    Volver a la Tienda
+                </a>
+            </div>
+        {% else %}
+            <!-- PROCESO DE PAGO -->
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 25px;">
+                
+                <!-- RESUMEN DE COMPRA -->
+                <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 20px; border-radius: 4px; height: fit-content;">
+                    <h3 style="margin-top: 0; color: #e5a823; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
+                        Resumen del Pedido
+                    </h3>
+                    <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">
+                        {% for item in carrito %}
+                            <li style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; border-bottom: 1px dashed #1c3d66; padding-bottom: 5px;">
+                                <span>{{ item.nombre }} (x{{ item.cantidad }})</span>
+                                <span style="color: #e5a823; font-weight: bold;">${{ (item.precio * item.cantidad) | formato_precio }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; border-top: 2px solid #1c3d66; padding-top: 10px;">
+                        <span>Total:</span>
+                        <span style="color: #e5a823;">${{ total_pagar | formato_precio }}</span>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO DE MÉTODOS DE PAGO -->
+                <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
+                    <h3 style="margin-top: 0; color: #e5a823; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
+                        Selecciona tu Método de Pago
+                    </h3>
+
+                    <form action="/pasarela_pago" method="POST">
+                        <!-- OPCIÓN 1: PSE -->
+                        <div style="margin-bottom: 15px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
+                            <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="metodo_pago" value="PSE" checked onclick="mostrarOpcion('pse')">
+                                💳 PSE (Débito Bancario)
+                            </label>
+                            
+                            <div id="sec-pse" style="margin-top: 10px; display: block;">
+                                <label style="font-size: 11px; text-transform: uppercase; color: #a2b7d0;">Selecciona tu Banco:</label>
+                                <select name="banco_pse" style="width: 100%; padding: 8px; margin-top: 4px; background: #08111e; border: 1px solid #1c3d66; color: white;">
+                                    <option value="bancolombia">Bancolombia</option>
+                                    <option value="davivienda">Davivienda</option>
+                                    <option value="nequi">Nequi</option>
+                                    <option value="banco_bogota">Banco de Bogotá</option>
+                                    <option value="bbva">BBVA</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- OPCIÓN 2: TARJETA DE CRÉDITO/DÉBITO -->
+                        <div style="margin-bottom: 15px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
+                            <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="metodo_pago" value="Tarjeta de Crédito / Débito" onclick="mostrarOpcion('tarjeta')">
+                                💳 Tarjeta de Crédito / Débito
+                            </label>
+
+                            <div id="sec-tarjeta" style="margin-top: 10px; display: none;">
+                                <input type="text" placeholder="Número de Tarjeta" style="width: 100%; box-sizing: border-box; padding: 8px; margin-bottom: 8px; background: #08111e; border: 1px solid #1c3d66; color: white;">
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" placeholder="MM/AA" style="flex: 1; padding: 8px; background: #08111e; border: 1px solid #1c3d66; color: white;">
+                                    <input type="text" placeholder="CVC" style="flex: 1; padding: 8px; background: #08111e; border: 1px solid #1c3d66; color: white;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OPCIÓN 3: TRANSFERENCIA DIRECTA -->
+                        <div style="margin-bottom: 20px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
+                            <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="metodo_pago" value="Transferencia Bancaria" onclick="mostrarOpcion('banco')">
+                                🏛 Transferencia Bancaria Directa
+                            </label>
+
+                            <div id="sec-banco" style="margin-top: 10px; display: none; font-size: 12px; color: #a2b7d0;">
+                                <p style="margin: 2px 0;"><strong>Cuenta de Ahorros:</strong> 123-456789-00</p>
+                                <p style="margin: 2px 0;"><strong>Titular:</strong> WarDog Store S.A.S.</p>
+                                <p style="margin: 2px 0;"><strong>NIT:</strong> 900.123.456-7</p>
+                            </div>
+                        </div>
+
+                        <button type="submit" style="width: 100%; background-color: #e5a823; color: #0c2340; border: none; padding: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
+                            Pagar ${{ total_pagar | formato_precio }}
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        {% endif %}
+
+    </main>
+
+    <script>
+        function mostrarOpcion(tipo) {
+            document.getElementById('sec-pse').style.display = (tipo === 'pse') ? 'block' : 'none';
+            document.getElementById('sec-tarjeta').style.display = (tipo === 'tarjeta') ? 'block' : 'none';
+            document.getElementById('sec-banco').style.display = (tipo === 'banco') ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>

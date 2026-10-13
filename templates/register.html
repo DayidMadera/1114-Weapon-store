@@ -2,41 +2,51 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Crear Cuenta - Mercado Libre</title>
+    <title>Registro de Cuenta - WarDog Store</title>
 </head>
-<body>
-    <h1>Crear Cuenta</h1>
+<body style="font-family: 'Arial', sans-serif; background-color: #08111e; color: #ffffff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px 0;">
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul style="color: red;">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+    <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 40px; border-radius: 4px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h1 style="margin-top: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase; text-align: center;">
+            <span style="color: #e5a823;">WARDOG</span> STORE
+        </h1>
+        <p style="text-align: center; color: #a2b7d0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 25px;">Crear Nueva Cuenta</p>
 
-    <form action="/registro" method="POST">
-        <label>Nombre Completo:</label><br>
-        <input type="text" name="nombre" required><br><br>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background-color: #3d0c0c; border: 1px solid #ff5252; color: #ff5252; padding: 10px; font-size: 13px; margin-bottom: 15px; border-radius: 2px;">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
 
-        <label>Correo Electrónico:</label><br>
-        <input type="email" name="email" required><br><br>
+        <form action="/registro" method="POST">
+            <label style="display: block; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; color: #a2b7d0;">Nombre Completo:</label>
+            <input type="text" name="nombre" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 15px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required><br>
 
-        <label>Contraseña:</label><br>
-        <input type="password" name="password" required><br><br>
+            <label style="display: block; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; color: #a2b7d0;">Correo Electrónico:</label>
+            <input type="email" name="email" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 15px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required><br>
 
-        <label>Tipo de Cuenta:</label><br>
-        <select name="rol" required>
-            <option value="comprador">Quiero Comprar (Comprador)</option>
-            <option value="vendedor">Quiero Vender (Vendedor)</option>
-        </select><br><br>
+            <label style="display: block; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; color: #a2b7d0;">Contraseña:</label>
+            <input type="password" name="password" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 15px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required><br>
 
-        <button type="submit">Registrarse</button>
-    </form>
+            <label style="display: block; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; color: #a2b7d0;">Rol en la plataforma:</label>
+            <select name="rol" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 25px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
+                <option value="cliente">Cliente / Comprador</option>
+                <option value="vendedor">Vendedor / Tienda</option>
+            </select><br>
 
-    <p>¿Ya tienes cuenta? <a href="/login">Inicia Sesión aquí</a></p>
-    <p><a href="/">← Volver al inicio</a></p>
+            <button type="submit" style="width: 100%; background-color: #e5a823; color: #0c2340; border: none; padding: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
+                Registrarse
+            </button>
+        </form>
+
+        <p style="text-align: center; margin-top: 20px; font-size: 13px; color: #a2b7d0;">
+            ¿Ya tienes una cuenta? <a href="/login" style="color: #e5a823; text-decoration: none; font-weight: bold;">Inicia sesión aquí</a>
+        </p>
+    </div>
+
 </body>
 </html>

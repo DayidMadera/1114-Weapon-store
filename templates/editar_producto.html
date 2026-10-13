@@ -2,43 +2,78 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Editar Producto - Panel Vendedor</title>
+    <title>Editar Producto - WarDog Store</title>
 </head>
-<body style="font-family: Arial, sans-serif; margin: 20px;">
-    <header style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>Editar Producto</h1>
-        <a href="/vendedor">← Cancelar y Volver</a>
+<body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #08111e; color: #ffffff;">
+
+    <!-- HEADER / NAVEGACIÓN -->
+    <header style="background-color: #0c2340; border-bottom: 3px solid #e5a823; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
+            <span style="color: #e5a823;">WARDOG</span> STORE
+        </h1>
+        <a href="/vendedor" style="color: #e5a823; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+            ← Cancelar y Volver
+        </a>
     </header>
-    <hr>
 
-    <main style="max-width: 800px; margin: 0 auto;">
-        <form action="{{ url_for('editar_producto', id=producto.id) }}" method="POST" enctype="multipart/form-data">
-            <label><strong>Nombre del Producto:</strong></label><br>
-            <input type="text" name="nombre" value="{{ producto.nombre }}" style="width: 100%; padding: 8px;" required><br><br>
+    <main style="max-width: 800px; margin: 40px auto; padding: 0 20px;">
+        <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 30px; border-radius: 4px;">
+            <h2 style="margin-top: 0; text-transform: uppercase; letter-spacing: 2px; color: #e5a823; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
+                Editar Producto
+            </h2>
 
-            <label><strong>Precio ($):</strong></label><br>
-            <input type="number" step="0.01" name="precio" value="{{ producto.precio }}" style="width: 100%; padding: 8px;" required><br><br>
+            <form action="{{ url_for('editar_producto', id=producto.id) }}" method="POST" enctype="multipart/form-data">
+                <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                    Nombre del Producto:
+                </label>
+                <input type="text" name="nombre" value="{{ producto.nombre }}" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
 
-            <label><strong>Stock Disponible:</strong></label><br>
-            <input type="number" name="stock" value="{{ producto.stock }}" min="0" style="width: 100%; padding: 8px;" required><br><br>
+                <div style="display: flex; gap: 20px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                            Precio ($):
+                        </label>
+                        <input type="number" step="0.01" name="precio" value="{{ producto.precio }}" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
+                    </div>
 
-            <label><strong>Opción de Envío:</strong></label><br>
-            <select name="envio" style="width: 100%; padding: 8px;" required>
-                <option value="Envío Gratis a todo el país" {% if producto.envio == 'Envío Gratis a todo el país' %}selected{% endif %}>Envío Gratis a todo el país</option>
-                <option value="Envío Estándar ($5.000)" {% if producto.envio == 'Envío Estándar ($5.000)' %}selected{% endif %}>Envío Estándar ($5.000)</option>
-                <option value="Retiro en local del vendedor" {% if producto.envio == 'Retiro en local del vendedor' %}selected{% endif %}>Retiro en local del vendedor</option>
-            </select><br><br>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                            Stock Disponible:
+                        </label>
+                        <input type="number" name="stock" value="{{ producto.stock }}" min="0" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
+                    </div>
+                </div>
 
-            <label><strong>Descripción y Detalles:</strong></label><br>
-            <textarea name="descripcion" rows="5" style="width: 100%; padding: 8px;" required>{{ producto.descripcion }}</textarea><br><br>
+                <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                    Opción de Envío:
+                </label>
+                <select name="envio" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
+                    <option value="Envío Gratis a todo el país" {% if producto.envio == 'Envío Gratis a todo el país' %}selected{% endif %}>Envío Gratis a todo el país</option>
+                    <option value="Envío Estándar ($5.000)" {% if producto.envio == 'Envío Estándar ($5.000)' %}selected{% endif %}>Envío Estándar ($5.000)</option>
+                    <option value="Retiro en local del vendedor" {% if producto.envio == 'Retiro en local del vendedor' %}selected{% endif %}>Retiro en local del vendedor</option>
+                </select>
 
-            <label><strong>Reemplazar Imágenes (Opcional - Seleccionar varias):</strong></label><br>
-            <input type="file" name="imagenes_archivos" accept="image/*" multiple><br><br>
+                <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                    Descripción y Detalles:
+                </label>
+                <textarea name="descripcion" rows="5" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px; font-family: inherit;" required>{{ producto.descripcion }}</textarea>
 
-            <button type="submit" style="background-color: #1976d2; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px;">
-                Guardar Cambios
-            </button>
-        </form>
+                <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                    Reemplazar Imágenes (Opcional - Seleccionar varias):
+                </label>
+                <input type="file" name="imagenes_archivos" accept="image/*" multiple style="margin-bottom: 25px; color: #a2b7d0;"><br>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="background-color: #e5a823; color: #0c2340; border: none; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
+                        Guardar Cambios
+                    </button>
+                    <a href="/vendedor" style="background-color: transparent; border: 1px solid #1c3d66; color: #a2b7d0; padding: 12px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-decoration: none; border-radius: 2px;">
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
     </main>
+
 </body>
 </html>
