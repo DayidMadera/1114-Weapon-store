@@ -1,19 +1,26 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'clave_secreta_wardogstore_super_segura'
 
-@app.template_filter('formato_precio')
-def formato_precio(valor):
-    try:
-        return f"{int(valor):,}".replace(",", ".")
-    except (ValueError, TypeError):
-        return valor
+# -----------------------------------------------------------------------------
+# CONFIGURACIÓN Y VARIABLES DE ENTORNO
+# -----------------------------------------------------------------------------
+# Clave secreta obtenida desde la variable de entorno (con valor por defecto si no existe)
+app.config['SECRET_KEY'] = os.getenv("SESSION_SECRET", "Wardog2026_default_key")
 
+# Desactivado por defecto. Solo activa debug si DEBUG="true" o "1"
+DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1")
+
+# Habilitar protección CSRF para todos los formularios POST/PUT/DELETE
+csrf = CSRFProtect(app)
+
+# Configuración de uploads y base de datos
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -22,6 +29,41 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# -----------------------------------------------------------------------------
+# FILTROS DE PLANTILLA
+# -----------------------------------------------------------------------------
+@app.template_filter('formato_precio')
+def formato_precio(valor):
+    try:
+        return f"{int(valor):,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return valor
+
+# -----------------------------------------------------------------------------
+# DECORADORES DE AUTORIZACIÓN Y ROLES
+# -----------------------------------------------------------------------------
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            flash('Debes iniciar sesión para acceder a esta sección.')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(rol_requerido):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'usuario_id' not in session:
+                return redirect(url_for('login'))
+            if session.get('usuario_rol') != rol_requerido:
+                flash('Acceso denegado: No tienes los permisos requeridos.')
+                return redirect(url_for('inicio'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # -----------------------------------------------------------------------------
 # MODELOS DE LA BASE DE DATOS
@@ -62,7 +104,7 @@ with app.app_context():
     db.create_all()
 
 # -----------------------------------------------------------------------------
-# AUTENTICACIÓN
+# RUTAS DE AUTENTICACIÓN
 # -----------------------------------------------------------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -119,10 +161,8 @@ def logout():
 # RUTAS DE VITRINA, PERFIL Y SEGUIDORES
 # -----------------------------------------------------------------------------
 @app.route('/')
+@login_required
 def inicio():
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario = Usuario.query.get(session['usuario_id'])
     productos = Producto.query.all()
     carrito = session.get('carrito', [])
@@ -130,10 +170,8 @@ def inicio():
     return render_template('index.html', productos=productos, total_items=total_items, usuario=usuario)
 
 @app.route('/producto/<int:id>')
+@login_required
 def detalle_producto(id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario_actual = Usuario.query.get(session['usuario_id'])
     producto = Producto.query.get_or_404(id)
     vendedor = producto.vendedor
@@ -152,10 +190,8 @@ def detalle_producto(id):
 
 @app.route('/perfil')
 @app.route('/perfil/<int:user_id>')
+@login_required
 def vista_perfil(user_id=None):
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario_actual = Usuario.query.get(session['usuario_id'])
     
     if user_id is None or user_id == usuario_actual.id:
@@ -187,10 +223,8 @@ def vista_perfil(user_id=None):
     )
 
 @app.route('/seguir/<int:id>', methods=['POST'])
+@login_required
 def seguir_usuario(id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario_actual_id = session['usuario_id']
     if usuario_actual_id != id:
         existente = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
@@ -203,10 +237,8 @@ def seguir_usuario(id):
     return redirect(request.referrer or url_for('vista_perfil', user_id=id))
 
 @app.route('/dejar_de_seguir/<int:id>', methods=['POST'])
+@login_required
 def dejar_de_seguir(id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario_actual_id = session['usuario_id']
     seguimiento = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
     if seguimiento:
@@ -217,10 +249,8 @@ def dejar_de_seguir(id):
     return redirect(request.referrer or url_for('vista_perfil', user_id=id))
 
 @app.route('/editar_perfil', methods=['POST'])
+@login_required
 def editar_perfil():
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario = Usuario.query.get(session['usuario_id'])
     descripcion = request.form.get('descripcion')
     
@@ -240,13 +270,11 @@ def editar_perfil():
     return redirect(url_for('vista_perfil'))
 
 # -----------------------------------------------------------------------------
-# CARRITO Y PASARELA DE PAGO
+# RUTAS DE CARRITO Y PASARELA DE PAGO
 # -----------------------------------------------------------------------------
 @app.route('/cliente')
+@login_required
 def vista_cliente():
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario = Usuario.query.get(session['usuario_id'])
     carrito = session.get('carrito', [])
     
@@ -262,10 +290,8 @@ def vista_cliente():
     return render_template('cliente.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
 
 @app.route('/agregar_al_carrito/<int:id>', methods=['POST'])
+@login_required
 def agregar_al_carrito(id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     producto = Producto.query.get_or_404(id)
     if producto.stock <= 0:
         return redirect(url_for('inicio'))
@@ -298,15 +324,14 @@ def agregar_al_carrito(id):
     return redirect(url_for('vista_cliente'))
 
 @app.route('/vaciar_carrito', methods=['POST'])
+@login_required
 def vaciar_carrito():
     session.pop('carrito', None)
     return redirect(url_for('vista_cliente'))
 
 @app.route('/pasarela_pago', methods=['GET', 'POST'])
+@login_required
 def pasarela_pago():
-    if 'usuario_id' not in session:
-        return redirect(url_for('login'))
-
     usuario = Usuario.query.get(session['usuario_id'])
     carrito = session.get('carrito', [])
 
@@ -330,23 +355,20 @@ def pasarela_pago():
     return render_template('pasarela_pago.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
 
 # -----------------------------------------------------------------------------
-# PANEL DE VENDEDOR Y GESTIÓN DE PRODUCTOS E IMÁGENES
+# PANEL DE VENDEDOR Y GESTIÓN PROTEGIDA DE PRODUCTOS E IMÁGENES
 # -----------------------------------------------------------------------------
 @app.route('/vendedor')
+@login_required
+@role_required('vendedor')
 def vista_vendedor():
-    if session.get('usuario_rol') != 'vendedor':
-        flash('Acceso denegado: Esta área es exclusiva para vendedores.')
-        return redirect(url_for('login'))
-
     usuario = Usuario.query.get(session['usuario_id'])
     productos = Producto.query.filter_by(vendedor_id=usuario.id).all()
     return render_template('vendedor.html', productos=productos, usuario=usuario)
 
 @app.route('/vendedor/producto/nuevo', methods=['POST'])
+@login_required
+@role_required('vendedor')
 def agregar_producto():
-    if session.get('usuario_rol') != 'vendedor':
-        return redirect(url_for('login'))
-
     nombre = request.form.get('nombre')
     precio = float(request.form.get('precio', 0))
     stock = int(request.form.get('stock', 1))
@@ -379,16 +401,18 @@ def agregar_producto():
         db.session.add(foto_default)
 
     db.session.commit()
+    flash('Producto publicado exitosamente.')
     return redirect(url_for('vista_vendedor'))
 
 @app.route('/vendedor/producto/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+@role_required('vendedor')
 def editar_producto(id):
-    if session.get('usuario_rol') != 'vendedor':
-        return redirect(url_for('login'))
-
     producto = Producto.query.get_or_404(id)
+    
+    # AISLAMIENTO: Verificar que el producto pertenezca al vendedor en sesión
     if producto.vendedor_id != session['usuario_id']:
-        flash('No tienes permiso para editar este producto.')
+        flash('Acceso denegado: No puedes modificar productos de otro vendedor.')
         return redirect(url_for('vista_vendedor'))
 
     if request.method == 'POST':
@@ -415,13 +439,13 @@ def editar_producto(id):
     return render_template('editar_producto.html', producto=producto, usuario=usuario)
 
 @app.route('/vendedor/foto/eliminar/<int:foto_id>', methods=['POST'])
+@login_required
+@role_required('vendedor')
 def eliminar_foto(foto_id):
-    if session.get('usuario_rol') != 'vendedor':
-        return redirect(url_for('login'))
-
     foto = FotoProducto.query.get_or_404(foto_id)
     producto = Producto.query.get(foto.producto_id)
 
+    # AISLAMIENTO: Verificar que el producto de la foto pertenezca al vendedor en sesión
     if producto and producto.vendedor_id == session['usuario_id']:
         ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
         if os.path.exists(ruta_archivo):
@@ -435,17 +459,27 @@ def eliminar_foto(foto_id):
         flash('Imagen eliminada correctamente.')
         return redirect(url_for('editar_producto', id=producto.id))
 
+    flash('Acceso denegado: No puedes eliminar imágenes de productos de otros vendedores.')
     return redirect(url_for('vista_vendedor'))
 
 @app.route('/vendedor/producto/eliminar/<int:id>', methods=['POST'])
+@login_required
+@role_required('vendedor')
 def eliminar_producto(id):
-    if session.get('usuario_rol') != 'vendedor':
-        return redirect(url_for('login'))
-
     producto = Producto.query.get_or_404(id)
+    
+    # AISLAMIENTO: Verificar que el producto pertenezca al vendedor en sesión
+    if producto.vendedor_id != session['usuario_id']:
+        flash('Acceso denegado: No puedes eliminar productos de otro vendedor.')
+        return redirect(url_for('vista_vendedor'))
+
     db.session.delete(producto)
     db.session.commit()
+    flash('Producto eliminado con éxito.')
     return redirect(url_for('vista_vendedor'))
 
+# -----------------------------------------------------------------------------
+# PUNTO DE ENTRADA PRINCIPAL
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=DEBUG)
