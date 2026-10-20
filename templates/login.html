@@ -23,6 +23,9 @@
         {% endwith %}
 
         <form action="/login" method="POST">
+            <!-- Token CSRF -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
             <label style="display: block; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Correo Electrónico:</label>
             <input type="email" name="email" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 15px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required><br>
 

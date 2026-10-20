@@ -6,7 +6,6 @@
 </head>
 <body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #08111e; color: #ffffff;">
 
-    <!-- HEADER / NAVEGACIÓN -->
     <header style="background-color: #0c2340; border-bottom: 3px solid #e5a823; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
         <h1 style="margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
             <span style="color: #e5a823;">WARDOG</span> STORE
@@ -34,7 +33,6 @@
         {% endif %}
 
         {% if carrito %}
-            <!-- TABLA DE PRODUCTOS EN CARRITO CON FOTO -->
             <div style="background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: left;">
                     <thead>
@@ -70,7 +68,6 @@
                 </table>
             </div>
 
-            <!-- TOTAL Y ACCIONES -->
             <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 20px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <h3 style="margin: 0; text-transform: uppercase; letter-spacing: 1px; color: #ffffff; font-size: 18px;">
                     Total a Pagar: <span style="color: #e5a823; font-size: 24px; font-weight: bold; margin-left: 10px;">${{ total_pagar | formato_precio }}</span>
@@ -78,19 +75,19 @@
 
                 <div style="display: flex; gap: 10px;">
                     <form action="/vaciar_carrito" method="POST" style="margin: 0;">
+                        <!-- Token CSRF -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: transparent; border: 1px solid #ff5252; color: #ff5252; padding: 12px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             Vaciar Carrito
                         </button>
                     </form>
 
-<!-- Reemplazar en cliente.html el formulario de compra por este enlace/botón -->
-<a href="/pasarela_pago" style="background-color: #e5a823; color: #0c2340; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-decoration: none; border-radius: 2px; display: inline-block;">
-    Proceder al Pago
-</a>
+                    <a href="/pasarela_pago" style="background-color: #e5a823; color: #0c2340; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-decoration: none; border-radius: 2px; display: inline-block;">
+                        Proceder al Pago
+                    </a>
                 </div>
             </div>
         {% else %}
-            <!-- ESTADO VACÍO -->
             <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 40px 20px; border-radius: 4px; text-align: center;">
                 <p style="color: #a2b7d0; font-size: 16px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Tu carrito está vacío actualmente.</p>
                 <a href="/" style="background-color: #e5a823; color: #0c2340; text-decoration: none; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px; display: inline-block;">

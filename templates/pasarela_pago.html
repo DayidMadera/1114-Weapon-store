@@ -18,7 +18,6 @@
     <main style="max-width: 850px; margin: 40px auto; padding: 0 20px;">
 
         {% if pago_exitoso %}
-            <!-- PAGO EXITOSO -->
             <div style="background-color: #0c2340; border: 2px solid #e5a823; padding: 40px; border-radius: 4px; text-align: center;">
                 <h1 style="color: #e5a823; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">
                     ✓ ¡Transacción Exitosa!
@@ -35,10 +34,8 @@
                 </a>
             </div>
         {% else %}
-            <!-- PROCESO DE PAGO -->
             <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 25px;">
                 
-                <!-- RESUMEN DE COMPRA -->
                 <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 20px; border-radius: 4px; height: fit-content;">
                     <h3 style="margin-top: 0; color: #e5a823; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
                         Resumen del Pedido
@@ -57,14 +54,15 @@
                     </div>
                 </div>
 
-                <!-- FORMULARIO DE MÉTODOS DE PAGO -->
                 <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
                     <h3 style="margin-top: 0; color: #e5a823; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
                         Selecciona tu Método de Pago
                     </h3>
 
                     <form action="/pasarela_pago" method="POST">
-                        <!-- OPCIÓN 1: PSE -->
+                        <!-- Token CSRF -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                         <div style="margin-bottom: 15px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
                             <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                                 <input type="radio" name="metodo_pago" value="PSE" checked onclick="mostrarOpcion('pse')">
@@ -83,7 +81,6 @@
                             </div>
                         </div>
 
-                        <!-- OPCIÓN 2: TARJETA DE CRÉDITO/DÉBITO -->
                         <div style="margin-bottom: 15px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
                             <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                                 <input type="radio" name="metodo_pago" value="Tarjeta de Crédito / Débito" onclick="mostrarOpcion('tarjeta')">
@@ -99,7 +96,6 @@
                             </div>
                         </div>
 
-                        <!-- OPCIÓN 3: TRANSFERENCIA DIRECTA -->
                         <div style="margin-bottom: 20px; background: #061527; padding: 12px; border: 1px solid #1c3d66; border-radius: 2px;">
                             <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                                 <input type="radio" name="metodo_pago" value="Transferencia Bancaria" onclick="mostrarOpcion('banco')">

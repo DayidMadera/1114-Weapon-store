@@ -22,7 +22,16 @@
 
     <main style="max-width: 950px; margin: 40px auto; padding: 0 20px;">
         
-        <!-- CARD PRINCIPAL DE PERFIL -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background-color: #0c2340; border: 1px solid #e5a823; color: #e5a823; padding: 12px; font-size: 13px; margin-bottom: 20px; border-radius: 2px;">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <div style="background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; padding: 25px; display: flex; gap: 25px; align-items: center; position: relative;">
             <img src="{{ usuario.foto_perfil }}" alt="Foto de Perfil" width="130" height="130" style="border-radius: 50%; object-fit: cover; border: 3px solid #e5a823;">
             <div style="flex: 1;">
@@ -40,12 +49,16 @@
             <div style="position: absolute; top: 25px; right: 25px;">
                 {% if lo_sigo %}
                     <form action="/dejar_de_seguir/{{ usuario.id }}" method="POST">
+                        <!-- Token CSRF -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: transparent; border: 2px solid #e5a823; color: #e5a823; padding: 10px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             Siguiendo ✓
                         </button>
                     </form>
                 {% else %}
                     <form action="/seguir/{{ usuario.id }}" method="POST">
+                        <!-- Token CSRF -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: #e5a823; border: none; color: #0c2340; padding: 10px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             + Seguir
                         </button>
@@ -55,7 +68,6 @@
             {% endif %}
         </div>
 
-        <!-- ESTADÍSTICAS -->
         <div style="margin-top: 25px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
             {% if usuario.rol == 'vendedor' %}
             <div style="background-color: #0c2340; border-top: 4px solid #e5a823; padding: 20px; text-align: center; border-radius: 2px;">
@@ -75,7 +87,6 @@
             </div>
         </div>
 
-        <!-- PRODUCTOS PUBLICADOS POR ESTE USUARIO -->
         {% if usuario.rol == 'vendedor' %}
         <div style="margin-top: 40px;">
             <h3 style="text-transform: uppercase; letter-spacing: 2px; color: #e5a823; border-bottom: 2px solid #1c3d66; padding-bottom: 10px;">
@@ -103,12 +114,14 @@
         {% endif %}
 
         {% if es_propio %}
-        <!-- FORMULARIO EDITAR PERFIL -->
         <div style="margin-top: 40px; background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
             <h3 style="margin-top: 0; text-transform: uppercase; letter-spacing: 1px; color: #e5a823; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
                 Editar Perfil
             </h3>
             <form action="/editar_perfil" method="POST" enctype="multipart/form-data">
+                <!-- Token CSRF -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                 <label style="display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; font-size: 12px;">Cambiar Imagen de Perfil:</label>
                 <input type="file" name="foto_archivo" accept="image/*" style="margin-bottom: 20px; color: #a2b7d0;"><br>
 

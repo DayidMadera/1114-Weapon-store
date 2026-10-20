@@ -6,7 +6,6 @@
 </head>
 <body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #08111e; color: #ffffff;">
 
-    <!-- HEADER / NAVEGACIÓN -->
     <header style="background-color: #0c2340; border-bottom: 3px solid #e5a823; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
         <h1 style="margin: 0; font-size: 24px; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
             <span style="color: #e5a823;">WARDOG</span> STORE
@@ -17,12 +16,48 @@
     </header>
 
     <main style="max-width: 800px; margin: 40px auto; padding: 0 20px;">
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background-color: #0c2340; border: 1px solid #e5a823; color: #e5a823; padding: 12px; font-size: 13px; margin-bottom: 25px; border-radius: 2px;">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <div style="background-color: #0c2340; border: 1px solid #1c3d66; padding: 30px; border-radius: 4px;">
             <h2 style="margin-top: 0; text-transform: uppercase; letter-spacing: 2px; color: #e5a823; border-bottom: 1px solid #1c3d66; padding-bottom: 10px;">
                 Editar Producto
             </h2>
 
+            <!-- GESTIÓN DE IMÁGENES EXISTENTES CON OPCIÓN DE ELIMINAR -->
+            {% if producto.imagenes %}
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; margin-bottom: 10px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
+                    Imágenes Actuales:
+                </label>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    {% for img in producto.imagenes %}
+                        <div style="position: relative; background: #061527; padding: 5px; border: 1px solid #1c3d66; border-radius: 2px; text-align: center;">
+                            <img src="{{ img.ruta }}" style="width: 80px; height: 80px; object-fit: cover; display: block; margin-bottom: 5px;">
+                            <form action="{{ url_for('eliminar_foto', foto_id=img.id) }}" method="POST" style="margin: 0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" style="background: #ff5252; color: white; border: none; padding: 4px 8px; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 100%;">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <form action="{{ url_for('editar_producto', id=producto.id) }}" method="POST" enctype="multipart/form-data">
+                <!-- Token CSRF -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
                     Nombre del Producto:
                 </label>
@@ -59,9 +94,9 @@
                 <textarea name="descripcion" rows="5" style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 18px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px; font-family: inherit;" required>{{ producto.descripcion }}</textarea>
 
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
-                    Reemplazar Imágenes (Opcional - Seleccionar varias):
+                    Agregar Nuevas Imágenes (Opcional):
                 </label>
-                <input type="file" name="imagenes_archivos" accept="image/*" multiple style="margin-bottom: 25px; color: #a2b7d0;"><br>
+                <input type="file" name="nuevas_imagenes" accept="image/*" multiple style="margin-bottom: 25px; color: #a2b7d0;"><br>
 
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" style="background-color: #e5a823; color: #0c2340; border: none; padding: 12px 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
