@@ -26,11 +26,15 @@
             Carrito de Compras
         </h2>
 
-        {% if compra_exitosa %}
-            <div style="background-color: #0c331a; border: 1px solid #2e7d32; color: #81c784; padding: 15px; margin-bottom: 20px; border-radius: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
-                ✓ ¡Gracias por tu compra! Tu pedido fue procesado exitosamente.
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background-color: #0c2340; border: 1px solid #e5a823; color: #e5a823; padding: 12px; font-size: 13px; margin-bottom: 20px; border-radius: 2px;">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
             </div>
-        {% endif %}
+          {% endif %}
+        {% endwith %}
 
         {% if carrito %}
             <div style="background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">
@@ -42,6 +46,7 @@
                             <th style="padding: 14px 18px; text-align: center;">Precio Unitario</th>
                             <th style="padding: 14px 18px; text-align: center;">Cantidad</th>
                             <th style="padding: 14px 18px; text-align: right;">Subtotal</th>
+                            <th style="padding: 14px 18px; text-align: center;">Acción</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -56,11 +61,33 @@
                             <td style="padding: 14px 18px; text-align: center; color: #a2b7d0;">
                                 ${{ item.precio | formato_precio }}
                             </td>
-                            <td style="padding: 14px 18px; text-align: center; color: #ffffff; font-weight: bold;">
-                                {{ item.cantidad }}
+                            <td style="padding: 14px 18px; text-align: center;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <form action="/actualizar_cantidad_carrito/{{ item.id }}" method="POST" style="margin: 0;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <input type="hidden" name="accion" value="restar"/>
+                                        <button type="submit" style="background-color: #061527; border: 1px solid #1c3d66; color: #e5a823; width: 28px; height: 28px; font-weight: bold; cursor: pointer; border-radius: 2px; font-size: 14px;">-</button>
+                                    </form>
+
+                                    <span style="color: #ffffff; font-weight: bold; min-width: 24px; text-align: center; font-size: 15px;">{{ item.cantidad }}</span>
+
+                                    <form action="/actualizar_cantidad_carrito/{{ item.id }}" method="POST" style="margin: 0;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <input type="hidden" name="accion" value="sumar"/>
+                                        <button type="submit" style="background-color: #061527; border: 1px solid #1c3d66; color: #e5a823; width: 28px; height: 28px; font-weight: bold; cursor: pointer; border-radius: 2px; font-size: 14px;">+</button>
+                                    </form>
+                                </div>
                             </td>
                             <td style="padding: 14px 18px; text-align: right; color: #e5a823; font-weight: bold;">
                                 ${{ (item.precio * item.cantidad) | formato_precio }}
+                            </td>
+                            <td style="padding: 14px 18px; text-align: center;">
+                                <form action="/eliminar_del_carrito/{{ item.id }}" method="POST" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" style="background-color: transparent; border: 1px solid #ff5252; color: #ff5252; padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 2px; font-size: 11px; text-transform: uppercase;">
+                                        Eliminar
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}
@@ -75,7 +102,6 @@
 
                 <div style="display: flex; gap: 10px;">
                     <form action="/vaciar_carrito" method="POST" style="margin: 0;">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: transparent; border: 1px solid #ff5252; color: #ff5252; padding: 12px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             Vaciar Carrito

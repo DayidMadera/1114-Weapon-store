@@ -11,16 +11,15 @@ app = Flask(__name__)
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN Y VARIABLES DE ENTORNO
 # -----------------------------------------------------------------------------
-# Clave secreta obtenida desde la variable de entorno (con valor por defecto si no existe)
 app.config['SECRET_KEY'] = os.getenv("SESSION_SECRET", "Wardog2026_default_key")
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1")
 
-# Desactivado por defecto. Solo activa debug si DEBUG="true" o "1"
-DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1")
+# Banderas de seguridad para la cookie de sesión
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Habilitar protección CSRF para todos los formularios POST/PUT/DELETE
 csrf = CSRFProtect(app)
 
-# Configuración de uploads y base de datos
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -29,6 +28,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+EXTENSIONES_PERMITIDAS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def es_imagen_permitida(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in EXTENSIONES_PERMITIDAS
 
 # -----------------------------------------------------------------------------
 # FILTROS DE PLANTILLA
@@ -41,6 +45,20 @@ def formato_precio(valor):
         return valor
 
 # -----------------------------------------------------------------------------
+# MANEJADORES DE ERRORES PERSONALIZADOS
+# -----------------------------------------------------------------------------
+@app.errorhandler(404)
+def pagina_no_encontrada(e):
+    flash('La página o recurso al que intentas acceder no existe.')
+    return redirect(url_for('inicio'))
+
+@app.errorhandler(500)
+def error_servidor(e):
+    db.session.rollback()
+    flash('Ocurrió un error interno en el servidor. Inténtalo de nuevo.')
+    return redirect(url_for('inicio'))
+
+# -----------------------------------------------------------------------------
 # DECORADORES DE AUTORIZACIÓN Y ROLES
 # -----------------------------------------------------------------------------
 def login_required(f):
@@ -49,6 +67,14 @@ def login_required(f):
         if 'usuario_id' not in session:
             flash('Debes iniciar sesión para acceder a esta sección.')
             return redirect(url_for('login'))
+
+        # Verificación de usuario existente en la base de datos
+        usuario = Usuario.query.get(session['usuario_id'])
+        if not usuario:
+            session.clear()
+            flash('Tu sesión expiró o no es válida. Por favor ingresa nuevamente.')
+            return redirect(url_for('login'))
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -109,8 +135,12 @@ with app.app_context():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not email or not password:
+            flash('Por favor ingresa correo y contraseña.')
+            return redirect(url_for('login'))
 
         usuario = Usuario.query.filter_by(email=email).first()
 
@@ -128,21 +158,33 @@ def login():
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
-        nombre = request.form.get('nombre')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        rol = request.form.get('rol')
+        nombre = request.form.get('nombre', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        rol = request.form.get('rol', '').strip()
+
+        if not nombre or not email or not password or not rol:
+            flash('Todos los campos son obligatorios.')
+            return redirect(url_for('registro'))
+
+        if rol not in ('cliente', 'vendedor'):
+            flash('Rol seleccionado no válido.')
+            return redirect(url_for('registro'))
 
         usuario_existente = Usuario.query.filter_by(email=email).first()
         if usuario_existente:
             flash('El correo ya está registrado.')
             return redirect(url_for('registro'))
 
-        hashed_password = generate_password_hash(password, method='scrypt')
-        nuevo_usuario = Usuario(nombre=nombre, email=email, password=hashed_password, rol=rol)
-        
-        db.session.add(nuevo_usuario)
-        db.session.commit()
+        try:
+            hashed_password = generate_password_hash(password, method='scrypt')
+            nuevo_usuario = Usuario(nombre=nombre, email=email, password=hashed_password, rol=rol)
+            db.session.add(nuevo_usuario)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash('Error al registrar el usuario. Inténtalo de nuevo.')
+            return redirect(url_for('registro'))
 
         session['usuario_id'] = nuevo_usuario.id
         session['usuario_nombre'] = nuevo_usuario.nombre
@@ -229,10 +271,13 @@ def seguir_usuario(id):
     if usuario_actual_id != id:
         existente = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
         if not existente:
-            nuevo_seguimiento = Seguidor(seguidor_id=usuario_actual_id, seguido_id=id)
-            db.session.add(nuevo_seguimiento)
-            db.session.commit()
-            flash('¡Ahora sigues a este usuario!')
+            try:
+                nuevo_seguimiento = Seguidor(seguidor_id=usuario_actual_id, seguido_id=id)
+                db.session.add(nuevo_seguimiento)
+                db.session.commit()
+                flash('¡Ahora sigues a este usuario!')
+            except Exception:
+                db.session.rollback()
 
     return redirect(request.referrer or url_for('vista_perfil', user_id=id))
 
@@ -242,9 +287,12 @@ def dejar_de_seguir(id):
     usuario_actual_id = session['usuario_id']
     seguimiento = Seguidor.query.filter_by(seguidor_id=usuario_actual_id, seguido_id=id).first()
     if seguimiento:
-        db.session.delete(seguimiento)
-        db.session.commit()
-        flash('Has dejado de seguir a este usuario.')
+        try:
+            db.session.delete(seguimiento)
+            db.session.commit()
+            flash('Has dejado de seguir a este usuario.')
+        except Exception:
+            db.session.rollback()
 
     return redirect(request.referrer or url_for('vista_perfil', user_id=id))
 
@@ -252,11 +300,15 @@ def dejar_de_seguir(id):
 @login_required
 def editar_perfil():
     usuario = Usuario.query.get(session['usuario_id'])
-    descripcion = request.form.get('descripcion')
+    descripcion = request.form.get('descripcion', '').strip()
     
     if 'foto_archivo' in request.files:
         archivo = request.files['foto_archivo']
         if archivo and archivo.filename != '':
+            if not es_imagen_permitida(archivo.filename):
+                flash('Tipo de imagen no permitido para la foto de perfil.')
+                return redirect(url_for('vista_perfil'))
+
             nombre_archivo = secure_filename(f"user_{usuario.id}_{archivo.filename}")
             ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
             archivo.save(ruta_guardado)
@@ -265,8 +317,13 @@ def editar_perfil():
     if descripcion:
         usuario.descripcion = descripcion
 
-    db.session.commit()
-    flash('Perfil actualizado con éxito.')
+    try:
+        db.session.commit()
+        flash('Perfil actualizado con éxito.')
+    except Exception:
+        db.session.rollback()
+        flash('Ocurrió un error al actualizar el perfil.')
+
     return redirect(url_for('vista_perfil'))
 
 # -----------------------------------------------------------------------------
@@ -292,9 +349,20 @@ def vista_cliente():
 @app.route('/agregar_al_carrito/<int:id>', methods=['POST'])
 @login_required
 def agregar_al_carrito(id):
-    producto = Producto.query.get_or_404(id)
-    if producto.stock <= 0:
+    producto = Producto.query.filter_by(id=id).first()
+    if not producto:
+        flash('El producto solicitado no existe.')
         return redirect(url_for('inicio'))
+
+    try:
+        cantidad_solicitada = int(request.form.get('cantidad', 1))
+    except ValueError:
+        flash('Cantidad inválida.')
+        return redirect(url_for('detalle_producto', id=id))
+
+    if cantidad_solicitada <= 0:
+        flash('La cantidad añadida debe ser mayor a cero.')
+        return redirect(url_for('detalle_producto', id=id))
 
     if 'carrito' not in session:
         session['carrito'] = []
@@ -303,10 +371,22 @@ def agregar_al_carrito(id):
     encontrado = False
     foto_ruta = producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png'
 
+    cantidad_en_carrito = 0
     for item in carrito:
         if item['id'] == producto.id:
-            if item['cantidad'] < producto.stock:
-                item['cantidad'] += 1
+            cantidad_en_carrito = item['cantidad']
+            break
+
+    total_proyectado = cantidad_en_carrito + cantidad_solicitada
+
+    if total_proyectado > producto.stock:
+        flash(f'No puedes añadir {cantidad_solicitada} unidades más. El stock disponible es de {producto.stock} (ya tienes {cantidad_en_carrito} en tu carrito).')
+        return redirect(request.referrer or url_for('inicio'))
+
+    for item in carrito:
+        if item['id'] == producto.id:
+            item['cantidad'] = total_proyectado
+            item['precio'] = producto.precio
             item['imagen'] = foto_ruta
             encontrado = True
             break
@@ -316,11 +396,45 @@ def agregar_al_carrito(id):
             'id': producto.id,
             'nombre': producto.nombre,
             'precio': producto.precio,
-            'cantidad': 1,
+            'cantidad': cantidad_solicitada,
             'imagen': foto_ruta
         })
 
     session.modified = True
+    flash(f'Se agregaron {cantidad_solicitada} unidad(es) de "{producto.nombre}" al carrito.')
+    return redirect(url_for('vista_cliente'))
+
+@app.route('/actualizar_cantidad_carrito/<int:id>', methods=['POST'])
+@login_required
+def actualizar_cantidad_carrito(id):
+    accion = request.form.get('accion')
+    producto = Producto.query.filter_by(id=id).first()
+    carrito = session.get('carrito', [])
+
+    for item in carrito:
+        if item['id'] == id:
+            if accion == 'sumar':
+                if producto and item['cantidad'] < producto.stock:
+                    item['cantidad'] += 1
+                else:
+                    flash(f'No hay más unidades disponibles. Stock máximo para "{item["nombre"]}": {producto.stock if producto else 0}.')
+            elif accion == 'restar':
+                if item['cantidad'] > 1:
+                    item['cantidad'] -= 1
+                else:
+                    flash('Llegaste al mínimo (1). Si deseas quitar el producto, usa el botón "Eliminar".')
+            break
+
+    session.modified = True
+    return redirect(url_for('vista_cliente'))
+
+@app.route('/eliminar_del_carrito/<int:id>', methods=['POST'])
+@login_required
+def eliminar_del_carrito(id):
+    carrito = session.get('carrito', [])
+    session['carrito'] = [item for item in carrito if item['id'] != id]
+    session.modified = True
+    flash('Producto eliminado del carrito.')
     return redirect(url_for('vista_cliente'))
 
 @app.route('/vaciar_carrito', methods=['POST'])
@@ -338,21 +452,43 @@ def pasarela_pago():
     if not carrito and request.method == 'GET':
         return redirect(url_for('vista_cliente'))
 
-    total_pagar = sum(item['precio'] * item['cantidad'] for item in carrito)
+    total_pagar = 0
+    carrito_validado = []
+    
+    for item in carrito:
+        prod = Producto.query.get(item['id'])
+        if prod:
+            subtotal = prod.precio * item['cantidad']
+            total_pagar += subtotal
+            carrito_validado.append(item)
 
     if request.method == 'POST':
         metodo_pago = request.form.get('metodo_pago', 'PSE')
         
         for item in carrito:
             producto = Producto.query.get(item['id'])
-            if producto:
-                producto.stock = max(0, producto.stock - item['cantidad'])
+            if not producto:
+                flash(f'El producto "{item["nombre"]}" ya no está disponible.')
+                return redirect(url_for('vista_cliente'))
 
-        db.session.commit()
-        session.pop('carrito', None)
-        return render_template('pasarela_pago.html', pago_exitoso=True, metodo_pago=metodo_pago, usuario=usuario, total_pagar=total_pagar, carrito=[])
+            if item['cantidad'] > producto.stock:
+                flash(f'No hay suficiente stock disponible para "{producto.nombre}". Stock actual: {producto.stock}.')
+                return redirect(url_for('vista_cliente'))
 
-    return render_template('pasarela_pago.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
+        try:
+            for item in carrito:
+                producto = Producto.query.get(item['id'])
+                producto.stock -= item['cantidad']
+
+            db.session.commit()
+            session.pop('carrito', None)
+            return render_template('pasarela_pago.html', pago_exitoso=True, metodo_pago=metodo_pago, usuario=usuario, total_pagar=total_pagar, carrito=[])
+        except Exception:
+            db.session.rollback()
+            flash('Ocurrió un error al procesar el pago. Por favor intenta de nuevo.')
+            return redirect(url_for('vista_cliente'))
+
+    return render_template('pasarela_pago.html', carrito=carrito_validado, total_pagar=total_pagar, usuario=usuario)
 
 # -----------------------------------------------------------------------------
 # PANEL DE VENDEDOR Y GESTIÓN PROTEGIDA DE PRODUCTOS E IMÁGENES
@@ -369,39 +505,68 @@ def vista_vendedor():
 @login_required
 @role_required('vendedor')
 def agregar_producto():
-    nombre = request.form.get('nombre')
-    precio = float(request.form.get('precio', 0))
-    stock = int(request.form.get('stock', 1))
-    descripcion = request.form.get('descripcion', 'Sin especificaciones detalladas.')
-    envio = request.form.get('envio', 'Envío Nacional Estándar')
-    vendedor_id = session['usuario_id']
+    nombre = request.form.get('nombre', '').strip()
+    precio_str = request.form.get('precio', '').strip()
+    stock_str = request.form.get('stock', '').strip()
+    descripcion = request.form.get('descripcion', '').strip()
+    envio = request.form.get('envio', '').strip()
 
-    nuevo_prod = Producto(
-        nombre=nombre,
-        precio=precio,
-        stock=stock,
-        descripcion=descripcion,
-        envio=envio,
-        vendedor_id=vendedor_id
-    )
-    db.session.add(nuevo_prod)
-    db.session.commit()
+    if not nombre or not precio_str or not stock_str or not descripcion or not envio:
+        flash('Todos los campos son obligatorios.')
+        return redirect(url_for('vista_vendedor'))
+
+    try:
+        precio = float(precio_str)
+        stock = int(stock_str)
+    except ValueError:
+        flash('El precio y el stock deben ser números válidos.')
+        return redirect(url_for('vista_vendedor'))
+
+    if precio <= 0:
+        flash('El precio debe ser un número positivo mayor que cero.')
+        return redirect(url_for('vista_vendedor'))
+
+    if stock < 0:
+        flash('El stock no puede ser un valor negativo.')
+        return redirect(url_for('vista_vendedor'))
 
     archivos = request.files.getlist('imagenes_archivos')
-    for i, archivo in enumerate(archivos):
+    for archivo in archivos:
         if archivo and archivo.filename != '':
-            nombre_archivo = secure_filename(f"prod_{nuevo_prod.id}_{i}_{archivo.filename}")
-            ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-            archivo.save(ruta_guardado)
-            nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=nuevo_prod.id)
-            db.session.add(nueva_foto)
+            if not es_imagen_permitida(archivo.filename):
+                flash('Tipo de archivo no permitido. Solo se aceptan imágenes (.png, .jpg, .jpeg, .gif, .webp).')
+                return redirect(url_for('vista_vendedor'))
 
-    if not nuevo_prod.imagenes:
-        foto_default = FotoProducto(ruta='/static/uploads/default_product.png', producto_id=nuevo_prod.id)
-        db.session.add(foto_default)
+    try:
+        nuevo_prod = Producto(
+            nombre=nombre,
+            precio=precio,
+            stock=stock,
+            descripcion=descripcion,
+            envio=envio,
+            vendedor_id=session['usuario_id']
+        )
+        db.session.add(nuevo_prod)
+        db.session.commit()
 
-    db.session.commit()
-    flash('Producto publicado exitosamente.')
+        for i, archivo in enumerate(archivos):
+            if archivo and archivo.filename != '':
+                nombre_archivo = secure_filename(f"prod_{nuevo_prod.id}_{i}_{archivo.filename}")
+                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+                archivo.save(ruta_guardado)
+                nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=nuevo_prod.id)
+                db.session.add(nueva_foto)
+
+        if not nuevo_prod.imagenes:
+            foto_default = FotoProducto(ruta='/static/uploads/default_product.png', producto_id=nuevo_prod.id)
+            db.session.add(foto_default)
+
+        db.session.commit()
+        flash('Producto publicado exitosamente.')
+    except Exception:
+        db.session.rollback()
+        flash('Ocurrió un error al publicar el producto.')
+
     return redirect(url_for('vista_vendedor'))
 
 @app.route('/vendedor/producto/editar/<int:id>', methods=['GET', 'POST'])
@@ -410,29 +575,60 @@ def agregar_producto():
 def editar_producto(id):
     producto = Producto.query.get_or_404(id)
     
-    # AISLAMIENTO: Verificar que el producto pertenezca al vendedor en sesión
     if producto.vendedor_id != session['usuario_id']:
         flash('Acceso denegado: No puedes modificar productos de otro vendedor.')
         return redirect(url_for('vista_vendedor'))
 
     if request.method == 'POST':
-        producto.nombre = request.form.get('nombre')
-        producto.precio = float(request.form.get('precio', 0))
-        producto.stock = int(request.form.get('stock', 1))
-        producto.envio = request.form.get('envio')
-        producto.descripcion = request.form.get('descripcion')
+        nombre = request.form.get('nombre', '').strip()
+        precio_str = request.form.get('precio', '').strip()
+        stock_str = request.form.get('stock', '').strip()
+        envio = request.form.get('envio', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+
+        if not nombre or not precio_str or not stock_str or not descripcion or not envio:
+            flash('Todos los campos son obligatorios.')
+            return redirect(url_for('editar_producto', id=producto.id))
+
+        try:
+            precio = float(precio_str)
+            stock = int(stock_str)
+        except ValueError:
+            flash('El precio y el stock deben ser números válidos.')
+            return redirect(url_for('editar_producto', id=producto.id))
+
+        if precio <= 0 or stock < 0:
+            flash('El precio debe ser positivo y el stock no puede ser negativo.')
+            return redirect(url_for('editar_producto', id=producto.id))
 
         archivos = request.files.getlist('nuevas_imagenes')
-        for i, archivo in enumerate(archivos):
+        for archivo in archivos:
             if archivo and archivo.filename != '':
-                nombre_archivo = secure_filename(f"prod_{producto.id}_{i}_{archivo.filename}")
-                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-                archivo.save(ruta_guardado)
-                nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=producto.id)
-                db.session.add(nueva_foto)
+                if not es_imagen_permitida(archivo.filename):
+                    flash('Tipo de archivo no permitido en imágenes.')
+                    return redirect(url_for('editar_producto', id=producto.id))
 
-        db.session.commit()
-        flash('Producto actualizado correctamente.')
+        try:
+            producto.nombre = nombre
+            producto.precio = precio
+            producto.stock = stock
+            producto.envio = envio
+            producto.descripcion = descripcion
+
+            for i, archivo in enumerate(archivos):
+                if archivo and archivo.filename != '':
+                    nombre_archivo = secure_filename(f"prod_{producto.id}_{i}_{archivo.filename}")
+                    ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+                    archivo.save(ruta_guardado)
+                    nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=producto.id)
+                    db.session.add(nueva_foto)
+
+            db.session.commit()
+            flash('Producto actualizado correctamente.')
+        except Exception:
+            db.session.rollback()
+            flash('Error al guardar los cambios en el producto.')
+
         return redirect(url_for('editar_producto', id=producto.id))
 
     usuario = Usuario.query.get(session['usuario_id'])
@@ -445,7 +641,6 @@ def eliminar_foto(foto_id):
     foto = FotoProducto.query.get_or_404(foto_id)
     producto = Producto.query.get(foto.producto_id)
 
-    # AISLAMIENTO: Verificar que el producto de la foto pertenezca al vendedor en sesión
     if producto and producto.vendedor_id == session['usuario_id']:
         ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
         if os.path.exists(ruta_archivo):
@@ -454,9 +649,14 @@ def eliminar_foto(foto_id):
             except Exception:
                 pass
         
-        db.session.delete(foto)
-        db.session.commit()
-        flash('Imagen eliminada correctamente.')
+        try:
+            db.session.delete(foto)
+            db.session.commit()
+            flash('Imagen eliminada correctamente.')
+        except Exception:
+            db.session.rollback()
+            flash('Error al eliminar la imagen de la base de datos.')
+
         return redirect(url_for('editar_producto', id=producto.id))
 
     flash('Acceso denegado: No puedes eliminar imágenes de productos de otros vendedores.')
@@ -468,18 +668,31 @@ def eliminar_foto(foto_id):
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
     
-    # AISLAMIENTO: Verificar que el producto pertenezca al vendedor en sesión
     if producto.vendedor_id != session['usuario_id']:
         flash('Acceso denegado: No puedes eliminar productos de otro vendedor.')
         return redirect(url_for('vista_vendedor'))
 
-    db.session.delete(producto)
-    db.session.commit()
-    flash('Producto eliminado con éxito.')
+    for foto in producto.imagenes:
+        if foto.ruta and not foto.ruta.endswith('default_product.png'):
+            ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
+            if os.path.exists(ruta_archivo):
+                try:
+                    os.remove(ruta_archivo)
+                except Exception:
+                    pass
+
+    try:
+        db.session.delete(producto)
+        db.session.commit()
+        flash('Producto e imágenes eliminados con éxito.')
+    except Exception:
+        db.session.rollback()
+        flash('Error al eliminar el producto de la base de datos.')
+
     return redirect(url_for('vista_vendedor'))
 
 # -----------------------------------------------------------------------------
 # PUNTO DE ENTRADA PRINCIPAL
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(debug=DEBUG)
+    app.run(debug=True)  

@@ -19,6 +19,16 @@
 
     <main style="max-width: 1000px; margin: 40px auto; padding: 0 20px;">
 
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background-color: #0c2340; border: 1px solid #e5a823; color: #e5a823; padding: 12px; font-size: 13px; margin-bottom: 20px; border-radius: 2px;">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <div style="display: flex; gap: 30px; background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
             
             <div style="flex: 1;">
@@ -45,10 +55,15 @@
 
                 {% if producto.stock > 0 %}
                     <form action="/agregar_al_carrito/{{ producto.id }}" method="POST">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <label style="font-size: 12px; color: #a2b7d0; font-weight: bold; text-transform: uppercase;">Cantidad:</label>
+                            <input type="number" name="cantidad" value="1" min="1" max="{{ producto.stock }}" style="width: 70px; padding: 8px; background-color: #061527; border: 1px solid #1c3d66; color: #ffffff; border-radius: 2px;" required>
+                        </div>
+
                         <button type="submit" style="width: 100%; background-color: #e5a823; color: #0c2340; border: none; padding: 14px; font-size: 15px; border-radius: 2px; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
-                            Añadir al Carrito / Comprar
+                            Añadir al Carrito
                         </button>
                     </form>
                 {% else %}
@@ -75,7 +90,6 @@
             <div>
                 {% if lo_sigo %}
                     <form action="/dejar_de_seguir/{{ vendedor.id }}" method="POST">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: transparent; border: 2px solid #e5a823; color: #e5a823; padding: 8px 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             Siguiendo ✓
@@ -83,7 +97,6 @@
                     </form>
                 {% else %}
                     <form action="/seguir/{{ vendedor.id }}" method="POST">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: #e5a823; border: none; color: #0c2340; padding: 8px 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             + Seguir Vendedor
