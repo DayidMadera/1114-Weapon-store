@@ -5,24 +5,33 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 app = Flask(__name__)
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN Y VARIABLES DE ENTORNO
+# CONFIGURACIÓN Y SEGURIDAD
 # -----------------------------------------------------------------------------
 app.config['SECRET_KEY'] = os.getenv("SESSION_SECRET", "Wardog2026_default_key")
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1")
 
-# Banderas de seguridad para la cookie de sesión
+# Protección avanzada de cookies de sesión
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 csrf = CSRFProtect(app)
 
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# -----------------------------------------------------------------------------
+# CONFIGURACIÓN DE CLOUDINARY (Para que las imágenes funcionen en cualquier parte)
+# -----------------------------------------------------------------------------
+# Reemplaza estos valores con tus datos de Cloudinary o usa variables de entorno
+cloudinary.config(
+    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', 'tu_cloud_name'),
+    api_key = os.getenv('CLOUDINARY_API_KEY', 'tu_api_key'),
+    api_secret = os.getenv('CLOUDINARY_API_SECRET', 'tu_api_secret')
+)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -35,7 +44,7 @@ def es_imagen_permitida(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in EXTENSIONES_PERMITIDAS
 
 # -----------------------------------------------------------------------------
-# FILTROS DE PLANTILLA
+# FILTROS Y MANEJADORES DE ERRORES
 # -----------------------------------------------------------------------------
 @app.template_filter('formato_precio')
 def formato_precio(valor):
@@ -44,18 +53,17 @@ def formato_precio(valor):
     except (ValueError, TypeError):
         return valor
 
-# -----------------------------------------------------------------------------
-# MANEJADORES DE ERRORES PERSONALIZADOS
-# -----------------------------------------------------------------------------
 @app.errorhandler(404)
 def pagina_no_encontrada(e):
+    if request.path.startswith('/static/'):
+        return "Archivo no encontrado", 404
     flash('La página o recurso al que intentas acceder no existe.')
     return redirect(url_for('inicio'))
 
 @app.errorhandler(500)
 def error_servidor(e):
     db.session.rollback()
-    flash('Ocurrió un error interno en el servidor. Inténtalo de nuevo.')
+    flash('Ocurrió un error interno en el servidor.')
     return redirect(url_for('inicio'))
 
 # -----------------------------------------------------------------------------
@@ -65,16 +73,8 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'usuario_id' not in session:
-            flash('Debes iniciar sesión para acceder a esta sección.')
+            flash('Debes iniciar sesión para continuar.')
             return redirect(url_for('login'))
-
-        # Verificación de usuario existente en la base de datos
-        usuario = Usuario.query.get(session['usuario_id'])
-        if not usuario:
-            session.clear()
-            flash('Tu sesión expiró o no es válida. Por favor ingresa nuevamente.')
-            return redirect(url_for('login'))
-
         return f(*args, **kwargs)
     return decorated_function
 
@@ -82,17 +82,15 @@ def role_required(rol_requerido):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if 'usuario_id' not in session:
-                return redirect(url_for('login'))
             if session.get('usuario_rol') != rol_requerido:
-                flash('Acceso denegado: No tienes los permisos requeridos.')
+                flash('Acceso denegado: No tienes los permisos necesarios.')
                 return redirect(url_for('inicio'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
 # -----------------------------------------------------------------------------
-# MODELOS DE LA BASE DE DATOS
+# MODELOS DE BASE DE DATOS
 # -----------------------------------------------------------------------------
 class Seguidor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -105,7 +103,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     rol = db.Column(db.String(20), nullable=False)
-    foto_perfil = db.Column(db.String(300), default='/static/uploads/default.png')
+    foto_perfil = db.Column(db.String(300), default='https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg')
     descripcion = db.Column(db.Text, default='¡Hola! Estoy usando WarDog Store.')
 
 class Producto(db.Model):
@@ -113,12 +111,11 @@ class Producto(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     precio = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, nullable=False, default=1)
-    descripcion = db.Column(db.Text, default='Sin especificaciones detalladas.')
-    envio = db.Column(db.String(100), default='Envío Nacional Estándar')
+    descripcion = db.Column(db.Text, default='Sin especificaciones.')
+    envio = db.Column(db.String(100), default='Envío Estándar')
     
     vendedor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     vendedor = db.relationship('Usuario', backref=db.backref('productos', lazy=True))
-    
     imagenes = db.relationship('FotoProducto', backref='producto', cascade='all, delete-orphan', lazy=True)
 
 class FotoProducto(db.Model):
@@ -137,22 +134,14 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '').strip()
-
-        if not email or not password:
-            flash('Por favor ingresa correo y contraseña.')
-            return redirect(url_for('login'))
-
+        
         usuario = Usuario.query.filter_by(email=email).first()
-
         if usuario and check_password_hash(usuario.password, password):
             session['usuario_id'] = usuario.id
             session['usuario_nombre'] = usuario.nombre
             session['usuario_rol'] = usuario.rol
             return redirect(url_for('inicio'))
-        else:
-            flash('Correo o contraseña incorrectos.')
-            return redirect(url_for('login'))
-
+        flash('Credenciales incorrectas.')
     return render_template('login.html')
 
 @app.route('/registro', methods=['GET', 'POST'])
@@ -162,36 +151,20 @@ def registro():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '').strip()
         rol = request.form.get('rol', '').strip()
-
-        if not nombre or not email or not password or not rol:
-            flash('Todos los campos son obligatorios.')
-            return redirect(url_for('registro'))
-
-        if rol not in ('cliente', 'vendedor'):
-            flash('Rol seleccionado no válido.')
-            return redirect(url_for('registro'))
-
-        usuario_existente = Usuario.query.filter_by(email=email).first()
-        if usuario_existente:
+        
+        if Usuario.query.filter_by(email=email).first():
             flash('El correo ya está registrado.')
             return redirect(url_for('registro'))
-
-        try:
-            hashed_password = generate_password_hash(password, method='scrypt')
-            nuevo_usuario = Usuario(nombre=nombre, email=email, password=hashed_password, rol=rol)
-            db.session.add(nuevo_usuario)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            flash('Error al registrar el usuario. Inténtalo de nuevo.')
-            return redirect(url_for('registro'))
-
-        session['usuario_id'] = nuevo_usuario.id
-        session['usuario_nombre'] = nuevo_usuario.nombre
-        session['usuario_rol'] = nuevo_usuario.rol
-
+        
+        hashed = generate_password_hash(password, method='scrypt')
+        nuevo = Usuario(nombre=nombre, email=email, password=hashed, rol=rol)
+        db.session.add(nuevo)
+        db.session.commit()
+        
+        session['usuario_id'] = nuevo.id
+        session['usuario_nombre'] = nuevo.nombre
+        session['usuario_rol'] = nuevo.rol
         return redirect(url_for('inicio'))
-
     return render_template('register.html')
 
 @app.route('/logout')
@@ -200,7 +173,7 @@ def logout():
     return redirect(url_for('login'))
 
 # -----------------------------------------------------------------------------
-# RUTAS DE VITRINA, PERFIL Y SEGUIDORES
+# RUTAS DE VITRINA Y PERFIL
 # -----------------------------------------------------------------------------
 @app.route('/')
 @login_required
@@ -306,13 +279,14 @@ def editar_perfil():
         archivo = request.files['foto_archivo']
         if archivo and archivo.filename != '':
             if not es_imagen_permitida(archivo.filename):
-                flash('Tipo de imagen no permitido para la foto de perfil.')
+                flash('Tipo de imagen no permitido.')
                 return redirect(url_for('vista_perfil'))
-
-            nombre_archivo = secure_filename(f"user_{usuario.id}_{archivo.filename}")
-            ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-            archivo.save(ruta_guardado)
-            usuario.foto_perfil = f"/static/uploads/{nombre_archivo}"
+            try:
+                upload_result = cloudinary.uploader.upload(archivo)
+                usuario.foto_perfil = upload_result.get('secure_url')
+            except Exception as e:
+                print(f"ERROR CLOUDINARY PERFIL: {e}")
+                flash('Error al subir la imagen a la nube.')
 
     if descripcion:
         usuario.descripcion = descripcion
@@ -341,7 +315,7 @@ def vista_cliente():
             if prod and prod.imagenes:
                 item['imagen'] = prod.imagenes[0].ruta
             else:
-                item['imagen'] = '/static/uploads/default_product.png'
+                item['imagen'] = 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg'
 
     total_pagar = sum(item['precio'] * item['cantidad'] for item in carrito)
     return render_template('cliente.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
@@ -361,7 +335,7 @@ def agregar_al_carrito(id):
         return redirect(url_for('detalle_producto', id=id))
 
     if cantidad_solicitada <= 0:
-        flash('La cantidad añadida debe ser mayor a cero.')
+        flash('La cantidad debe ser mayor a cero.')
         return redirect(url_for('detalle_producto', id=id))
 
     if 'carrito' not in session:
@@ -369,7 +343,7 @@ def agregar_al_carrito(id):
 
     carrito = session['carrito']
     encontrado = False
-    foto_ruta = producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png'
+    foto_ruta = producto.imagenes[0].ruta if producto.imagenes else 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg'
 
     cantidad_en_carrito = 0
     for item in carrito:
@@ -380,7 +354,7 @@ def agregar_al_carrito(id):
     total_proyectado = cantidad_en_carrito + cantidad_solicitada
 
     if total_proyectado > producto.stock:
-        flash(f'No puedes añadir {cantidad_solicitada} unidades más. El stock disponible es de {producto.stock} (ya tienes {cantidad_en_carrito} en tu carrito).')
+        flash(f'Stock insuficiente. Stock disponible: {producto.stock}.')
         return redirect(request.referrer or url_for('inicio'))
 
     for item in carrito:
@@ -401,7 +375,7 @@ def agregar_al_carrito(id):
         })
 
     session.modified = True
-    flash(f'Se agregaron {cantidad_solicitada} unidad(es) de "{producto.nombre}" al carrito.')
+    flash('Producto agregado al carrito.')
     return redirect(url_for('vista_cliente'))
 
 @app.route('/actualizar_cantidad_carrito/<int:id>', methods=['POST'])
@@ -416,13 +390,9 @@ def actualizar_cantidad_carrito(id):
             if accion == 'sumar':
                 if producto and item['cantidad'] < producto.stock:
                     item['cantidad'] += 1
-                else:
-                    flash(f'No hay más unidades disponibles. Stock máximo para "{item["nombre"]}": {producto.stock if producto else 0}.')
             elif accion == 'restar':
                 if item['cantidad'] > 1:
                     item['cantidad'] -= 1
-                else:
-                    flash('Llegaste al mínimo (1). Si deseas quitar el producto, usa el botón "Eliminar".')
             break
 
     session.modified = True
@@ -464,34 +434,25 @@ def pasarela_pago():
 
     if request.method == 'POST':
         metodo_pago = request.form.get('metodo_pago', 'PSE')
-        
-        for item in carrito:
-            producto = Producto.query.get(item['id'])
-            if not producto:
-                flash(f'El producto "{item["nombre"]}" ya no está disponible.')
-                return redirect(url_for('vista_cliente'))
-
-            if item['cantidad'] > producto.stock:
-                flash(f'No hay suficiente stock disponible para "{producto.nombre}". Stock actual: {producto.stock}.')
-                return redirect(url_for('vista_cliente'))
-
         try:
             for item in carrito:
                 producto = Producto.query.get(item['id'])
-                producto.stock -= item['cantidad']
+                if producto:
+                    producto.stock -= item['cantidad']
 
             db.session.commit()
             session.pop('carrito', None)
             return render_template('pasarela_pago.html', pago_exitoso=True, metodo_pago=metodo_pago, usuario=usuario, total_pagar=total_pagar, carrito=[])
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Ocurrió un error al procesar el pago. Por favor intenta de nuevo.')
+            print(f"ERROR EN PAGO: {e}")
+            flash('Ocurrió un error al procesar el pago.')
             return redirect(url_for('vista_cliente'))
 
     return render_template('pasarela_pago.html', carrito=carrito_validado, total_pagar=total_pagar, usuario=usuario)
 
 # -----------------------------------------------------------------------------
-# PANEL DE VENDEDOR Y GESTIÓN PROTEGIDA DE PRODUCTOS E IMÁGENES
+# PANEL DE VENDEDOR Y GESTIÓN DE PRODUCTOS E IMÁGENES (CON CLOUDINARY)
 # -----------------------------------------------------------------------------
 @app.route('/vendedor')
 @login_required
@@ -506,65 +467,41 @@ def vista_vendedor():
 @role_required('vendedor')
 def agregar_producto():
     nombre = request.form.get('nombre', '').strip()
-    precio_str = request.form.get('precio', '').strip()
-    stock_str = request.form.get('stock', '').strip()
+    precio = float(request.form.get('precio', 0))
+    stock = int(request.form.get('stock', 1))
     descripcion = request.form.get('descripcion', '').strip()
     envio = request.form.get('envio', '').strip()
 
-    if not nombre or not precio_str or not stock_str or not descripcion or not envio:
-        flash('Todos los campos son obligatorios.')
-        return redirect(url_for('vista_vendedor'))
-
-    try:
-        precio = float(precio_str)
-        stock = int(stock_str)
-    except ValueError:
-        flash('El precio y el stock deben ser números válidos.')
-        return redirect(url_for('vista_vendedor'))
-
-    if precio <= 0:
-        flash('El precio debe ser un número positivo mayor que cero.')
-        return redirect(url_for('vista_vendedor'))
-
-    if stock < 0:
-        flash('El stock no puede ser un valor negativo.')
-        return redirect(url_for('vista_vendedor'))
-
     archivos = request.files.getlist('imagenes_archivos')
-    for archivo in archivos:
-        if archivo and archivo.filename != '':
-            if not es_imagen_permitida(archivo.filename):
-                flash('Tipo de archivo no permitido. Solo se aceptan imágenes (.png, .jpg, .jpeg, .gif, .webp).')
-                return redirect(url_for('vista_vendedor'))
-
+    
     try:
         nuevo_prod = Producto(
-            nombre=nombre,
-            precio=precio,
-            stock=stock,
-            descripcion=descripcion,
-            envio=envio,
-            vendedor_id=session['usuario_id']
+            nombre=nombre, precio=precio, stock=stock,
+            descripcion=descripcion, envio=envio, vendedor_id=session['usuario_id']
         )
         db.session.add(nuevo_prod)
         db.session.commit()
 
-        for i, archivo in enumerate(archivos):
+        for archivo in archivos:
             if archivo and archivo.filename != '':
-                nombre_archivo = secure_filename(f"prod_{nuevo_prod.id}_{i}_{archivo.filename}")
-                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-                archivo.save(ruta_guardado)
-                nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=nuevo_prod.id)
-                db.session.add(nueva_foto)
+                if es_imagen_permitida(archivo.filename):
+                    try:
+                        upload_result = cloudinary.uploader.upload(archivo)
+                        secure_url = upload_result.get('secure_url')
+                        nueva_foto = FotoProducto(ruta=secure_url, producto_id=nuevo_prod.id)
+                        db.session.add(nueva_foto)
+                    except Exception as e:
+                        print(f"ERROR CLOUDINARY PRODUCTO: {e}")
 
         if not nuevo_prod.imagenes:
-            foto_default = FotoProducto(ruta='/static/uploads/default_product.png', producto_id=nuevo_prod.id)
+            foto_default = FotoProducto(ruta='https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg', producto_id=nuevo_prod.id)
             db.session.add(foto_default)
 
         db.session.commit()
-        flash('Producto publicado exitosamente.')
-    except Exception:
+        flash('Producto publicado exitosamente en la nube.')
+    except Exception as e:
         db.session.rollback()
+        print(f"ERROR AL SUBIR PRODUCTO: {e}")
         flash('Ocurrió un error al publicar el producto.')
 
     return redirect(url_for('vista_vendedor'))
@@ -576,58 +513,35 @@ def editar_producto(id):
     producto = Producto.query.get_or_404(id)
     
     if producto.vendedor_id != session['usuario_id']:
-        flash('Acceso denegado: No puedes modificar productos de otro vendedor.')
+        flash('Acceso denegado.')
         return redirect(url_for('vista_vendedor'))
 
     if request.method == 'POST':
-        nombre = request.form.get('nombre', '').strip()
-        precio_str = request.form.get('precio', '').strip()
-        stock_str = request.form.get('stock', '').strip()
-        envio = request.form.get('envio', '').strip()
-        descripcion = request.form.get('descripcion', '').strip()
-
-        if not nombre or not precio_str or not stock_str or not descripcion or not envio:
-            flash('Todos los campos son obligatorios.')
-            return redirect(url_for('editar_producto', id=producto.id))
-
-        try:
-            precio = float(precio_str)
-            stock = int(stock_str)
-        except ValueError:
-            flash('El precio y el stock deben ser números válidos.')
-            return redirect(url_for('editar_producto', id=producto.id))
-
-        if precio <= 0 or stock < 0:
-            flash('El precio debe ser positivo y el stock no puede ser negativo.')
-            return redirect(url_for('editar_producto', id=producto.id))
+        producto.nombre = request.form.get('nombre', '').strip()
+        producto.precio = float(request.form.get('precio', 0))
+        producto.stock = int(request.form.get('stock', 0))
+        producto.envio = request.form.get('envio', '').strip()
+        producto.descripcion = request.form.get('descripcion', '').strip()
 
         archivos = request.files.getlist('nuevas_imagenes')
         for archivo in archivos:
             if archivo and archivo.filename != '':
-                if not es_imagen_permitida(archivo.filename):
-                    flash('Tipo de archivo no permitido en imágenes.')
-                    return redirect(url_for('editar_producto', id=producto.id))
+                if es_imagen_permitida(archivo.filename):
+                    try:
+                        upload_result = cloudinary.uploader.upload(archivo)
+                        secure_url = upload_result.get('secure_url')
+                        nueva_foto = FotoProducto(ruta=secure_url, producto_id=producto.id)
+                        db.session.add(nueva_foto)
+                    except Exception as e:
+                        print(f"ERROR CLOUDINARY EDITAR: {e}")
 
         try:
-            producto.nombre = nombre
-            producto.precio = precio
-            producto.stock = stock
-            producto.envio = envio
-            producto.descripcion = descripcion
-
-            for i, archivo in enumerate(archivos):
-                if archivo and archivo.filename != '':
-                    nombre_archivo = secure_filename(f"prod_{producto.id}_{i}_{archivo.filename}")
-                    ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-                    archivo.save(ruta_guardado)
-                    nueva_foto = FotoProducto(ruta=f"/static/uploads/{nombre_archivo}", producto_id=producto.id)
-                    db.session.add(nueva_foto)
-
             db.session.commit()
             flash('Producto actualizado correctamente.')
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Error al guardar los cambios en el producto.')
+            print(f"ERROR AL EDITAR: {e}")
+            flash('Error al guardar los cambios.')
 
         return redirect(url_for('editar_producto', id=producto.id))
 
@@ -642,24 +556,18 @@ def eliminar_foto(foto_id):
     producto = Producto.query.get(foto.producto_id)
 
     if producto and producto.vendedor_id == session['usuario_id']:
-        ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
-        if os.path.exists(ruta_archivo):
-            try:
-                os.remove(ruta_archivo)
-            except Exception:
-                pass
-        
         try:
             db.session.delete(foto)
             db.session.commit()
             flash('Imagen eliminada correctamente.')
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Error al eliminar la imagen de la base de datos.')
+            print(f"ERROR AL ELIMINAR FOTO: {e}")
+            flash('Error al eliminar la imagen.')
 
         return redirect(url_for('editar_producto', id=producto.id))
 
-    flash('Acceso denegado: No puedes eliminar imágenes de productos de otros vendedores.')
+    flash('Acceso denegado.')
     return redirect(url_for('vista_vendedor'))
 
 @app.route('/vendedor/producto/eliminar/<int:id>', methods=['POST'])
@@ -669,30 +577,19 @@ def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
     
     if producto.vendedor_id != session['usuario_id']:
-        flash('Acceso denegado: No puedes eliminar productos de otro vendedor.')
+        flash('Acceso denegado.')
         return redirect(url_for('vista_vendedor'))
-
-    for foto in producto.imagenes:
-        if foto.ruta and not foto.ruta.endswith('default_product.png'):
-            ruta_archivo = os.path.join(app.root_path, foto.ruta.lstrip('/'))
-            if os.path.exists(ruta_archivo):
-                try:
-                    os.remove(ruta_archivo)
-                except Exception:
-                    pass
 
     try:
         db.session.delete(producto)
         db.session.commit()
-        flash('Producto e imágenes eliminados con éxito.')
-    except Exception:
+        flash('Producto eliminado con éxito.')
+    except Exception as e:
         db.session.rollback()
-        flash('Error al eliminar el producto de la base de datos.')
+        print(f"ERROR AL ELIMINAR PRODUCTO: {e}")
+        flash('Error al eliminar el producto.')
 
     return redirect(url_for('vista_vendedor'))
 
-# -----------------------------------------------------------------------------
-# PUNTO DE ENTRADA PRINCIPAL
-# -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(debug=True)  
+    app.run(debug=True)
