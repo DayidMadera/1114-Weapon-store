@@ -32,7 +32,6 @@
                 Editar Producto
             </h2>
 
-            <!-- GESTIÓN DE IMÁGENES EXISTENTES CON OPCIÓN DE ELIMINAR -->
             {% if producto.imagenes %}
             <div style="margin-bottom: 25px;">
                 <label style="display: block; margin-bottom: 10px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
@@ -55,7 +54,6 @@
             {% endif %}
 
             <form action="{{ url_for('editar_producto', id=producto.id) }}" method="POST" enctype="multipart/form-data">
-                <!-- Token CSRF -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">

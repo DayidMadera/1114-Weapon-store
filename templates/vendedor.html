@@ -39,7 +39,6 @@
             </h2>
 
             <form action="/vendedor/producto/nuevo" method="POST" enctype="multipart/form-data">
-                <!-- Token CSRF -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #a2b7d0;">
@@ -97,7 +96,7 @@
                 <div style="background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between;">
                     
                     <div style="display: flex; align-items: center; gap: 20px;">
-                        <img src="{{ prod.imagenes[0].ruta if prod.imagenes else '/static/uploads/default_product.png' }}" width="65" height="65" style="object-fit: cover; border-radius: 2px; border: 1px solid #1c3d66;">
+                        <img src="{{ prod.imagenes[0].ruta if prod.imagenes else 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg' }}" width="65" height="65" style="object-fit: cover; border-radius: 2px; border: 1px solid #1c3d66;">
                         <div>
                             <strong style="text-transform: uppercase; font-size: 16px; letter-spacing: 0.5px; color: #ffffff;">{{ prod.nombre }}</strong>
                             <p style="margin: 4px 0 0 0; color: #e5a823; font-weight: bold;">${{ prod.precio | formato_precio }}</p>
@@ -113,7 +112,6 @@
                         </a>
 
                         <form action="/vendedor/producto/eliminar/{{ prod.id }}" method="POST" style="margin: 0;">
-                            <!-- Token CSRF -->
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" style="background-color: transparent; border: 1px solid #ff5252; color: #ff5252; padding: 8px 16px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
                                 Eliminar

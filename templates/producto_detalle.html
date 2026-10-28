@@ -32,7 +32,7 @@
         <div style="display: flex; gap: 30px; background-color: #0c2340; border: 1px solid #1c3d66; padding: 25px; border-radius: 4px;">
             
             <div style="flex: 1;">
-                <img id="imagen-principal" src="{{ producto.imagenes[0].ruta if producto.imagenes else '/static/uploads/default_product.png' }}" alt="{{ producto.nombre }}" style="width: 100%; border-radius: 2px; border: 1px solid #1c3d66; height: 320px; object-fit: cover;">
+                <img id="imagen-principal" src="{{ producto.imagenes[0].ruta if producto.imagenes else 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg' }}" alt="{{ producto.nombre }}" style="width: 100%; border-radius: 2px; border: 1px solid #1c3d66; height: 320px; object-fit: cover;">
 
                 <div style="display: flex; gap: 10px; margin-top: 10px; overflow-x: auto;">
                     {% for img in producto.imagenes %}

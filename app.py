@@ -1,13 +1,10 @@
 import os
+import uuid
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
 
 app = Flask(__name__)
 
@@ -17,31 +14,38 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv("SESSION_SECRET", "Wardog2026_default_key")
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1")
 
-# Protección avanzada de cookies de sesión
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 csrf = CSRFProtect(app)
-
-# -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE CLOUDINARY (Para que las imágenes funcionen en cualquier parte)
-# -----------------------------------------------------------------------------
-# Reemplaza estos valores con tus datos de Cloudinary o usa variables de entorno
-cloudinary.config(
-    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', 'tu_cloud_name'),
-    api_key = os.getenv('CLOUDINARY_API_KEY', 'tu_api_key'),
-    api_secret = os.getenv('CLOUDINARY_API_SECRET', 'tu_api_secret')
-)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# -----------------------------------------------------------------------------
+# CONFIGURACIÓN DE ALMACENAMIENTO LOCAL
+# -----------------------------------------------------------------------------
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 EXTENSIONES_PERMITIDAS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+IMAGEN_DEFAULT = 'https://ui-avatars.com/api/?name=Guest&background=1f2937&color=ffffff&size=256'
 
 def es_imagen_permitida(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in EXTENSIONES_PERMITIDAS
+
+def guardar_imagen_local(archivo):
+    """Guarda una imagen en la carpeta static/uploads/ con un nombre único."""
+    if archivo and es_imagen_permitida(archivo.filename):
+        ext = archivo.filename.rsplit('.', 1)[1].lower()
+        nombre_unico = f"{uuid.uuid4().hex}.{ext}"
+        ruta_destino = os.path.join(app.config['UPLOAD_FOLDER'], nombre_unico)
+        archivo.save(ruta_destino)
+        return f"/static/uploads/{nombre_unico}"
+    return None
 
 # -----------------------------------------------------------------------------
 # FILTROS Y MANEJADORES DE ERRORES
@@ -67,29 +71,6 @@ def error_servidor(e):
     return redirect(url_for('inicio'))
 
 # -----------------------------------------------------------------------------
-# DECORADORES DE AUTORIZACIÓN Y ROLES
-# -----------------------------------------------------------------------------
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'usuario_id' not in session:
-            flash('Debes iniciar sesión para continuar.')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def role_required(rol_requerido):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if session.get('usuario_rol') != rol_requerido:
-                flash('Acceso denegado: No tienes los permisos necesarios.')
-                return redirect(url_for('inicio'))
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-# -----------------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -----------------------------------------------------------------------------
 class Seguidor(db.Model):
@@ -103,7 +84,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     rol = db.Column(db.String(20), nullable=False)
-    foto_perfil = db.Column(db.String(300), default='https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg')
+    foto_perfil = db.Column(db.String(300), default=IMAGEN_DEFAULT)
     descripcion = db.Column(db.Text, default='¡Hola! Estoy usando WarDog Store.')
 
 class Producto(db.Model):
@@ -125,6 +106,36 @@ class FotoProducto(db.Model):
 
 with app.app_context():
     db.create_all()
+
+# -----------------------------------------------------------------------------
+# DECORADORES DE AUTORIZACIÓN Y ROLES
+# -----------------------------------------------------------------------------
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            flash('Debes iniciar sesión para continuar.')
+            return redirect(url_for('login'))
+        
+        usuario = db.session.get(Usuario, session['usuario_id'])
+        if not usuario:
+            session.clear()
+            flash('La sesión ha expirado o el usuario ya no existe.')
+            return redirect(url_for('login'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(rol_requerido):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if session.get('usuario_rol') != rol_requerido:
+                flash('Acceso denegado: No tienes los permisos necesarios.')
+                return redirect(url_for('inicio'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # -----------------------------------------------------------------------------
 # RUTAS DE AUTENTICACIÓN
@@ -178,7 +189,7 @@ def logout():
 @app.route('/')
 @login_required
 def inicio():
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     productos = Producto.query.all()
     carrito = session.get('carrito', [])
     total_items = sum(item['cantidad'] for item in carrito)
@@ -187,8 +198,8 @@ def inicio():
 @app.route('/producto/<int:id>')
 @login_required
 def detalle_producto(id):
-    usuario_actual = Usuario.query.get(session['usuario_id'])
-    producto = Producto.query.get_or_404(id)
+    usuario_actual = db.session.get(Usuario, session['usuario_id'])
+    producto = db.get_or_404(Producto, id)
     vendedor = producto.vendedor
     
     seguidores_vendedor = Seguidor.query.filter_by(seguido_id=vendedor.id).count()
@@ -207,13 +218,13 @@ def detalle_producto(id):
 @app.route('/perfil/<int:user_id>')
 @login_required
 def vista_perfil(user_id=None):
-    usuario_actual = Usuario.query.get(session['usuario_id'])
+    usuario_actual = db.session.get(Usuario, session['usuario_id'])
     
     if user_id is None or user_id == usuario_actual.id:
         usuario = usuario_actual
         es_propio = True
     else:
-        usuario = Usuario.query.get_or_404(user_id)
+        usuario = db.get_or_404(Usuario, user_id)
         es_propio = False
 
     mis_productos = Producto.query.filter_by(vendedor_id=usuario.id).all() if usuario.rol == 'vendedor' else []
@@ -272,21 +283,18 @@ def dejar_de_seguir(id):
 @app.route('/editar_perfil', methods=['POST'])
 @login_required
 def editar_perfil():
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     descripcion = request.form.get('descripcion', '').strip()
     
     if 'foto_archivo' in request.files:
         archivo = request.files['foto_archivo']
         if archivo and archivo.filename != '':
-            if not es_imagen_permitida(archivo.filename):
-                flash('Tipo de imagen no permitido.')
+            ruta_local = guardar_imagen_local(archivo)
+            if ruta_local:
+                usuario.foto_perfil = ruta_local
+            else:
+                flash('Tipo de imagen no permitido o archivo inválido.')
                 return redirect(url_for('vista_perfil'))
-            try:
-                upload_result = cloudinary.uploader.upload(archivo)
-                usuario.foto_perfil = upload_result.get('secure_url')
-            except Exception as e:
-                print(f"ERROR CLOUDINARY PERFIL: {e}")
-                flash('Error al subir la imagen a la nube.')
 
     if descripcion:
         usuario.descripcion = descripcion
@@ -306,16 +314,16 @@ def editar_perfil():
 @app.route('/cliente')
 @login_required
 def vista_cliente():
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     carrito = session.get('carrito', [])
     
     for item in carrito:
         if 'imagen' not in item:
-            prod = Producto.query.get(item['id'])
+            prod = db.session.get(Producto, item['id'])
             if prod and prod.imagenes:
                 item['imagen'] = prod.imagenes[0].ruta
             else:
-                item['imagen'] = 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg'
+                item['imagen'] = IMAGEN_DEFAULT
 
     total_pagar = sum(item['precio'] * item['cantidad'] for item in carrito)
     return render_template('cliente.html', carrito=carrito, total_pagar=total_pagar, usuario=usuario)
@@ -323,7 +331,7 @@ def vista_cliente():
 @app.route('/agregar_al_carrito/<int:id>', methods=['POST'])
 @login_required
 def agregar_al_carrito(id):
-    producto = Producto.query.filter_by(id=id).first()
+    producto = db.session.get(Producto, id)
     if not producto:
         flash('El producto solicitado no existe.')
         return redirect(url_for('inicio'))
@@ -343,7 +351,7 @@ def agregar_al_carrito(id):
 
     carrito = session['carrito']
     encontrado = False
-    foto_ruta = producto.imagenes[0].ruta if producto.imagenes else 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg'
+    foto_ruta = producto.imagenes[0].ruta if producto.imagenes else IMAGEN_DEFAULT
 
     cantidad_en_carrito = 0
     for item in carrito:
@@ -382,7 +390,7 @@ def agregar_al_carrito(id):
 @login_required
 def actualizar_cantidad_carrito(id):
     accion = request.form.get('accion')
-    producto = Producto.query.filter_by(id=id).first()
+    producto = db.session.get(Producto, id)
     carrito = session.get('carrito', [])
 
     for item in carrito:
@@ -416,7 +424,7 @@ def vaciar_carrito():
 @app.route('/pasarela_pago', methods=['GET', 'POST'])
 @login_required
 def pasarela_pago():
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     carrito = session.get('carrito', [])
 
     if not carrito and request.method == 'GET':
@@ -426,7 +434,7 @@ def pasarela_pago():
     carrito_validado = []
     
     for item in carrito:
-        prod = Producto.query.get(item['id'])
+        prod = db.session.get(Producto, item['id'])
         if prod:
             subtotal = prod.precio * item['cantidad']
             total_pagar += subtotal
@@ -436,7 +444,7 @@ def pasarela_pago():
         metodo_pago = request.form.get('metodo_pago', 'PSE')
         try:
             for item in carrito:
-                producto = Producto.query.get(item['id'])
+                producto = db.session.get(Producto, item['id'])
                 if producto:
                     producto.stock -= item['cantidad']
 
@@ -452,13 +460,13 @@ def pasarela_pago():
     return render_template('pasarela_pago.html', carrito=carrito_validado, total_pagar=total_pagar, usuario=usuario)
 
 # -----------------------------------------------------------------------------
-# PANEL DE VENDEDOR Y GESTIÓN DE PRODUCTOS E IMÁGENES (CON CLOUDINARY)
+# PANEL DE VENDEDOR Y GESTIÓN DE PRODUCTOS E IMÁGENES
 # -----------------------------------------------------------------------------
 @app.route('/vendedor')
 @login_required
 @role_required('vendedor')
 def vista_vendedor():
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     productos = Producto.query.filter_by(vendedor_id=usuario.id).all()
     return render_template('vendedor.html', productos=productos, usuario=usuario)
 
@@ -484,21 +492,17 @@ def agregar_producto():
 
         for archivo in archivos:
             if archivo and archivo.filename != '':
-                if es_imagen_permitida(archivo.filename):
-                    try:
-                        upload_result = cloudinary.uploader.upload(archivo)
-                        secure_url = upload_result.get('secure_url')
-                        nueva_foto = FotoProducto(ruta=secure_url, producto_id=nuevo_prod.id)
-                        db.session.add(nueva_foto)
-                    except Exception as e:
-                        print(f"ERROR CLOUDINARY PRODUCTO: {e}")
+                ruta_local = guardar_imagen_local(archivo)
+                if ruta_local:
+                    nueva_foto = FotoProducto(ruta=ruta_local, producto_id=nuevo_prod.id)
+                    db.session.add(nueva_foto)
 
         if not nuevo_prod.imagenes:
-            foto_default = FotoProducto(ruta='https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg', producto_id=nuevo_prod.id)
+            foto_default = FotoProducto(ruta=IMAGEN_DEFAULT, producto_id=nuevo_prod.id)
             db.session.add(foto_default)
 
         db.session.commit()
-        flash('Producto publicado exitosamente en la nube.')
+        flash('Producto publicado exitosamente.')
     except Exception as e:
         db.session.rollback()
         print(f"ERROR AL SUBIR PRODUCTO: {e}")
@@ -510,7 +514,7 @@ def agregar_producto():
 @login_required
 @role_required('vendedor')
 def editar_producto(id):
-    producto = Producto.query.get_or_404(id)
+    producto = db.get_or_404(Producto, id)
     
     if producto.vendedor_id != session['usuario_id']:
         flash('Acceso denegado.')
@@ -526,14 +530,10 @@ def editar_producto(id):
         archivos = request.files.getlist('nuevas_imagenes')
         for archivo in archivos:
             if archivo and archivo.filename != '':
-                if es_imagen_permitida(archivo.filename):
-                    try:
-                        upload_result = cloudinary.uploader.upload(archivo)
-                        secure_url = upload_result.get('secure_url')
-                        nueva_foto = FotoProducto(ruta=secure_url, producto_id=producto.id)
-                        db.session.add(nueva_foto)
-                    except Exception as e:
-                        print(f"ERROR CLOUDINARY EDITAR: {e}")
+                ruta_local = guardar_imagen_local(archivo)
+                if ruta_local:
+                    nueva_foto = FotoProducto(ruta=ruta_local, producto_id=producto.id)
+                    db.session.add(nueva_foto)
 
         try:
             db.session.commit()
@@ -545,18 +545,25 @@ def editar_producto(id):
 
         return redirect(url_for('editar_producto', id=producto.id))
 
-    usuario = Usuario.query.get(session['usuario_id'])
+    usuario = db.session.get(Usuario, session['usuario_id'])
     return render_template('editar_producto.html', producto=producto, usuario=usuario)
 
 @app.route('/vendedor/foto/eliminar/<int:foto_id>', methods=['POST'])
 @login_required
 @role_required('vendedor')
 def eliminar_foto(foto_id):
-    foto = FotoProducto.query.get_or_404(foto_id)
-    producto = Producto.query.get(foto.producto_id)
+    foto = db.get_or_404(FotoProducto, foto_id)
+    producto = db.session.get(Producto, foto.producto_id)
 
     if producto and producto.vendedor_id == session['usuario_id']:
         try:
+            # Eliminar archivo físico si existe localmente
+            if foto.ruta.startswith('/static/uploads/'):
+                nombre_archivo = os.path.basename(foto.ruta)
+                ruta_fisica = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+                if os.path.exists(ruta_fisica):
+                    os.remove(ruta_fisica)
+
             db.session.delete(foto)
             db.session.commit()
             flash('Imagen eliminada correctamente.')
@@ -574,13 +581,21 @@ def eliminar_foto(foto_id):
 @login_required
 @role_required('vendedor')
 def eliminar_producto(id):
-    producto = Producto.query.get_or_404(id)
+    producto = db.get_or_404(Producto, id)
     
     if producto.vendedor_id != session['usuario_id']:
         flash('Acceso denegado.')
         return redirect(url_for('vista_vendedor'))
 
     try:
+        # Eliminar archivos físicos de las fotos asociadas
+        for foto in producto.imagenes:
+            if foto.ruta.startswith('/static/uploads/'):
+                nombre_archivo = os.path.basename(foto.ruta)
+                ruta_fisica = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+                if os.path.exists(ruta_fisica):
+                    os.remove(ruta_fisica)
+
         db.session.delete(producto)
         db.session.commit()
         flash('Producto eliminado con éxito.')

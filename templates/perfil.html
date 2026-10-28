@@ -49,7 +49,6 @@
             <div style="position: absolute; top: 25px; right: 25px;">
                 {% if lo_sigo %}
                     <form action="/dejar_de_seguir/{{ usuario.id }}" method="POST">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: transparent; border: 2px solid #e5a823; color: #e5a823; padding: 10px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             Siguiendo ✓
@@ -57,7 +56,6 @@
                     </form>
                 {% else %}
                     <form action="/seguir/{{ usuario.id }}" method="POST">
-                        <!-- Token CSRF -->
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" style="background-color: #e5a823; border: none; color: #0c2340; padding: 10px 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 2px;">
                             + Seguir
@@ -97,7 +95,7 @@
                 {% for prod in mis_productos %}
                     <div style="background-color: #0c2340; border: 1px solid #1c3d66; border-radius: 4px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
-                            <img src="{{ prod.imagenes[0].ruta if prod.imagenes else '/static/uploads/default_product.png' }}" alt="{{ prod.nombre }}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 2px; border: 1px solid #1c3d66;">
+                            <img src="{{ prod.imagenes[0].ruta if prod.imagenes else 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg' }}" alt="{{ prod.nombre }}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 2px; border: 1px solid #1c3d66;">
                             <h4 style="margin: 10px 0 5px 0; text-transform: uppercase; font-size: 14px; text-align: center;">{{ prod.nombre }}</h4>
                             <p style="margin: 0; color: #e5a823; font-weight: bold; text-align: center; font-size: 18px;">${{ prod.precio | formato_precio }}</p>
                             <p style="font-size: 11px; color: #a2b7d0; text-align: center; margin-top: 4px;">Stock: {{ prod.stock }} unidades</p>
@@ -119,7 +117,6 @@
                 Editar Perfil
             </h3>
             <form action="/editar_perfil" method="POST" enctype="multipart/form-data">
-                <!-- Token CSRF -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <label style="display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; font-size: 12px;">Cambiar Imagen de Perfil:</label>
